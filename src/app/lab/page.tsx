@@ -1,3 +1,5 @@
+"use client";
+
 import dynamic from 'next/dynamic'
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader } from 'lucide-react';
