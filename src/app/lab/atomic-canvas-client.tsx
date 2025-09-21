@@ -29,24 +29,37 @@ export default function AtomicCanvasClient() {
 
   const [status, setStatus] = useState<Status>("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const previousLeftFist = useRef<{ x: number, y: number } | null>(null);
+
 
   useEffect(() => {
     // Ensure this runs only on the client
     if (typeof window === "undefined") return;
 
     let animationFrameId: number;
+    let hands: any;
+    let mpCamera: any;
+
 
     const cleanup = () => {
       cancelAnimationFrame(animationFrameId);
       
-      // Stop video stream
+      mpCamera?.stop();
+      hands?.close();
+
       const stream = videoRef.current?.srcObject as MediaStream;
       stream?.getTracks().forEach((track) => track.stop());
 
-      // Dispose Three.js objects
       rendererRef.current?.dispose();
       cubeRef.current?.geometry.dispose();
       (cubeRef.current?.material as THREE.Material)?.dispose();
+    };
+
+    const isFist = (landmarks: any[]) => {
+      const fingerTipIndices = [4, 8, 12, 16, 20];
+      return fingerTipIndices.every(i => {
+        return landmarks[i].y > landmarks[i-2].y;
+      });
     };
 
     const init = async () => {
@@ -55,7 +68,6 @@ export default function AtomicCanvasClient() {
           throw new Error("Canvas or video element not found.");
         }
         
-        // Wait for MediaPipe scripts to load
         while (!window.Hands || !window.Camera || !window.drawConnectors) {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
@@ -64,7 +76,6 @@ export default function AtomicCanvasClient() {
         const threeCanvasEl = threeCanvasRef.current;
         const handsCanvasEl = handsCanvasRef.current;
 
-        // --- Setup Camera ---
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { width: 1280, height: 720 },
         });
@@ -81,8 +92,6 @@ export default function AtomicCanvasClient() {
         handsCanvasEl.height = height;
         const handsCtx = handsCanvasEl.getContext("2d")!;
 
-
-        // --- Setup Three.js Scene ---
         const scene = new THREE.Scene();
         sceneRef.current = scene;
         const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
@@ -91,7 +100,7 @@ export default function AtomicCanvasClient() {
         
         const renderer = new THREE.WebGLRenderer({
           canvas: threeCanvasEl,
-          alpha: true, // Transparent background
+          alpha: true,
         });
         renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(width, height);
@@ -109,30 +118,63 @@ export default function AtomicCanvasClient() {
         cubeRef.current = cube;
         scene.add(cube);
 
-        // --- Setup MediaPipe Hands ---
-        const hands = new window.Hands({
+        hands = new window.Hands({
           locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`,
         });
         hands.setOptions({
           maxNumHands: 2,
           modelComplexity: 1,
-          minDetectionConfidence: 0.5,
+          minDetectionConfidence: 0.7,
           minTrackingConfidence: 0.5,
         });
 
         hands.onResults((results: any) => {
           handsCtx.save();
           handsCtx.clearRect(0, 0, handsCanvasEl.width, handsCanvasEl.height);
+          
           if (results.multiHandLandmarks) {
-            for (const landmarks of results.multiHandLandmarks) {
-              window.drawConnectors(handsCtx, landmarks, window.HAND_CONNECTIONS, { color: '#007BFF', lineWidth: 5 });
-              window.drawLandmarks(handsCtx, landmarks, { color: '#FFC107', lineWidth: 2, radius: 5 });
+            results.multiHandLandmarks.forEach((landmarks: any, i: number) => {
+                window.drawConnectors(handsCtx, landmarks, window.HAND_CONNECTIONS, { color: '#007BFF', lineWidth: 5 });
+                window.drawLandmarks(handsCtx, landmarks, { color: '#FFC107', lineWidth: 2, radius: 5 });
+            });
+            
+            let leftHand = null;
+            if(results.multiHandedness){
+              results.multiHandedness.forEach((handedness: any, i: number) => {
+                if (handedness.label === 'Right') leftHand = results.multiHandLandmarks[i];
+              });
             }
+
+            if (leftHand && isFist(leftHand)) {
+              const x = (1 - leftHand[9].x) * window.innerWidth;
+              const y = leftHand[9].y * window.innerHeight;
+    
+              if (previousLeftFist.current && camera) {
+                const deltaX = x - previousLeftFist.current.x;
+                const deltaY = y - previousLeftFist.current.y;
+                
+                const radius = camera.position.length();
+                const theta = Math.atan2(camera.position.x, camera.position.z) + deltaX * -0.005;
+                const phi = Math.atan2(camera.position.y, Math.sqrt(camera.position.x ** 2 + camera.position.z ** 2)) - deltaY * -0.005;
+                const clampedPhi = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, phi));
+    
+                camera.position.x = radius * Math.sin(theta) * Math.cos(clampedPhi);
+                camera.position.z = radius * Math.cos(theta) * Math.cos(clampedPhi);
+                camera.position.y = radius * Math.sin(clampedPhi);
+                camera.lookAt(new THREE.Vector3(0, 0, 0));
+              }
+              previousLeftFist.current = { x, y };
+            } else {
+              previousLeftFist.current = null;
+            }
+          } else {
+             previousLeftFist.current = null;
           }
+
           handsCtx.restore();
         });
         
-        const mpCamera = new window.Camera(videoEl, {
+        mpCamera = new window.Camera(videoEl, {
           onFrame: async () => {
             await hands.send({ image: videoEl });
           },
@@ -141,7 +183,6 @@ export default function AtomicCanvasClient() {
         });
         mpCamera.start();
         
-        // --- Animation Loop ---
         const animate = () => {
           animationFrameId = requestAnimationFrame(animate);
           cube.rotation.x += 0.005;
@@ -187,7 +228,7 @@ export default function AtomicCanvasClient() {
             autoPlay
             muted
             className="w-full h-full object-cover transform -scale-x-100"
-            style={{ display: status === 'ready' ? 'block' : 'none' }}
+            style={{ display: status !== 'loading' ? 'block' : 'none' }}
           />
           <canvas
             ref={threeCanvasRef}
@@ -195,7 +236,7 @@ export default function AtomicCanvasClient() {
           />
           <canvas
             ref={handsCanvasRef}
-            className="absolute top-0 left-0 w-full h-full transform -scale-x-100"
+            className="absolute top-0 left-0 w-full h-full transform -scale-x-100 pointer-events-none"
           />
       </div>
     </div>
