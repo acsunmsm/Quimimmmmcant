@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
-import { data } from "@/lib/elementos.json";
+import data from "@/lib/elementos.json";
 
 const ELEMENTOS_DATA = data.elementos.reduce((acc, el) => {
   acc[el.simbolo] = el;
