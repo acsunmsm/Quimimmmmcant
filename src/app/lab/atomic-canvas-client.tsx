@@ -13,22 +13,22 @@ const ELEMENTOS_DATA = data.elementos.reduce((acc, el) => {
 
 
 const CARD_POSITIONS: { [key: string]: { x: number, y: number, z: number } } = {
-  H: { x: -6, y: -4, z: 0 },
-  He: { x: 6, y: -4, z: 0 },
-  Li: { x: -6, y: -5.5, z: 0 },
-  Be: { x: -4, y: -5.5, z: 0 },
-  B: { x: -2, y: -5.5, z: 0 },
-  C: { x: 0, y: -5.5, z: 0 },
-  N: { x: 2, y: -5.5, z: 0 },
-  O: { x: 4, y: -5.5, z: 0 },
-  F: { x: 6, y: -5.5, z: 0 },
-  Na: { x: -6, y: -7, z: 0 },
-  Mg: { x: -4, y: -7, z: 0 },
-  Al: { x: -2, y: -7, z: 0 },
-  Si: { x: 0, y: -7, z: 0 },
-  P: { x: 2, y: -7, z: 0 },
-  S: { x: 4, y: -7, z: 0 },
-  Cl: { x: 6, y: -7, z: 0 },
+  H: { x: -6, y: -1, z: 0 },
+  He: { x: 6, y: -1, z: 0 },
+  Li: { x: -6, y: -2.5, z: 0 },
+  Be: { x: -4, y: -2.5, z: 0 },
+  B: { x: -2, y: -2.5, z: 0 },
+  C: { x: 0, y: -2.5, z: 0 },
+  N: { x: 2, y: -2.5, z: 0 },
+  O: { x: 4, y: -2.5, z: 0 },
+  F: { x: 6, y: -2.5, z: 0 },
+  Na: { x: -6, y: -4, z: 0 },
+  Mg: { x: -4, y: -4, z: 0 },
+  Al: { x: -2, y: -4, z: 0 },
+  Si: { x: 0, y: -4, z: 0 },
+  P: { x: 2, y: -4, z: 0 },
+  S: { x: 4, y: -4, z: 0 },
+  Cl: { x: 6, y: -4, z: 0 },
 };
 
 declare global {
