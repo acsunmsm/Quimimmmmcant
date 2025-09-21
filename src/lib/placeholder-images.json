@@ -1,3 +1,10 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "welcome-bg",
+      "description": "Abstract atomic structure background",
+      "imageUrl": "https://picsum.photos/seed/atomic1/1920/1080",
+      "imageHint": "science abstract"
+    }
+  ]
 }
