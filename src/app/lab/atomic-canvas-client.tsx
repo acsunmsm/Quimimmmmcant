@@ -60,7 +60,6 @@ export default function AtomicCanvasClient() {
   const draggedCardRef = useRef<THREE.Group | null>(null);
   const pinchState = useRef({
     isPinching: false,
-    startCoords: { x: 0, y: 0 },
     lastScreenPos: { x: 0, y: 0 },
   }).current;
 
@@ -89,7 +88,7 @@ export default function AtomicCanvasClient() {
       const group = new THREE.Group();
       const cardGeometry = new THREE.BoxGeometry(1.8, 1.2, 0.15);
       const cardMaterial = new THREE.MeshLambertMaterial({
-        color: parseInt(elementData.color, 16),
+        color: parseInt(elementData.color.replace(/^0x/, ''), 16),
         transparent: true,
         opacity: 0.9
       });
@@ -157,72 +156,70 @@ export default function AtomicCanvasClient() {
         const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
         const isPinchingNow = distance < 0.05;
 
-        // Using middle of the pinch for screen coordinates
-        const pinchX = 1 - (indexTip.x + thumbTip.x) / 2;
-        const pinchY = (indexTip.y + thumbTip.y) / 2;
-
-        const screenX = pinchX * window.innerWidth;
-        const screenY = pinchY * window.innerHeight;
+        const pinchScreenX = (1 - (indexTip.x + thumbTip.x) / 2) * window.innerWidth;
+        const pinchScreenY = ((indexTip.y + thumbTip.y) / 2) * window.innerHeight;
 
         const isStartingPinch = isPinchingNow && !pinchState.isPinching;
         const isEndingPinch = !isPinchingNow && pinchState.isPinching;
 
-        // Handle Ending Pinch (Drop)
+        pinchState.isPinching = isPinchingNow;
+
+        // --- Handle Dragging ---
+        if (draggedCardRef.current && isPinchingNow) {
+            const dragDeltaX = pinchScreenX - pinchState.lastScreenPos.x;
+            const dragDeltaY = pinchScreenY - pinchState.lastScreenPos.y;
+
+            const vector = new THREE.Vector3();
+            vector.copy(draggedCardRef.current.position);
+            vector.project(camera); // screen-space position of the object (-1 to +1)
+
+            // Convert delta from screen pixels to NDC
+            vector.x += (dragDeltaX / window.innerWidth) * 2;
+            vector.y -= (dragDeltaY / window.innerHeight) * 2;
+            
+            vector.unproject(camera); // convert back to world space
+            
+            // Maintain original Z-distance from camera
+            const dir = vector.sub(camera.position).normalize();
+            const distance = -camera.position.z / dir.z; 
+            const newPos = camera.position.clone().add(dir.multiplyScalar(distance));
+            
+            draggedCardRef.current.position.x = newPos.x;
+            draggedCardRef.current.position.y = newPos.y;
+            
+            pinchState.lastScreenPos = { x: pinchScreenX, y: pinchScreenY };
+            return;
+        }
+
+        // --- Handle End of Drag (Drop) ---
         if (isEndingPinch && draggedCardRef.current) {
             draggedCardRef.current.userData.isDragging = false;
             draggedCardRef.current = null;
         }
 
-        pinchState.isPinching = isPinchingNow;
-
-        // Handle Dragging
-        if (draggedCardRef.current && isPinchingNow) {
-            const dragDelta = {
-                deltaX: screenX - pinchState.lastScreenPos.x,
-                deltaY: screenY - pinchState.lastScreenPos.y,
-            };
-
-            const vector = new THREE.Vector3();
-            // Project card's position to screen space
-            vector.copy(draggedCardRef.current.position);
-            vector.project(camera);
-
-            // Apply delta in screen space (NDC)
-            vector.x += dragDelta.deltaX / window.innerWidth * 2;
-            vector.y -= dragDelta.deltaY / window.innerHeight * 2;
-
-            // Unproject back to world space
-            vector.unproject(camera);
-            
-            const dir = vector.sub(camera.position).normalize();
-            const dist = -camera.position.z / dir.z;
-            const newPos = camera.position.clone().add(dir.multiplyScalar(dist));
-            
-            draggedCardRef.current.position.x = newPos.x;
-            draggedCardRef.current.position.y = newPos.y;
-            
-            pinchState.lastScreenPos = { x: screenX, y: screenY };
-            return;
-        }
-
-        // Detect Hover and Start Pinch (Grab)
+        // --- Detect Hover and Start of Drag (Grab) ---
         let hoveredCard: THREE.Group | null = null;
         let minDistance = Infinity;
 
-        cardMeshesRef.current.forEach(card => {
-            const projected = card.position.clone().project(camera);
-            const cardScreenX = ((projected.x + 1) / 2) * window.innerWidth;
-            const cardScreenY = ((1 - projected.y) / 2) * window.innerHeight;
-            
-            const dist = Math.hypot(screenX - cardScreenX, screenY - cardScreenY);
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        mouse.x = (pinchScreenX / window.innerWidth) * 2 - 1;
+        mouse.y = -(pinchScreenY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
 
-            if (dist < 60 && dist < minDistance) {
-                minDistance = dist;
-                hoveredCard = card;
+        const intersects = raycaster.intersectObjects(cardMeshesRef.current, true);
+
+        if (intersects.length > 0) {
+            let parentGroup = intersects[0].object;
+            while(parentGroup.parent && parentGroup.parent.type !== 'Scene') {
+                parentGroup = parentGroup.parent;
             }
-        });
-
-        // Reset scale for non-hovered cards
+            if (parentGroup.type === 'Group') {
+                 hoveredCard = parentGroup as THREE.Group;
+            }
+        }
+        
+        // Reset scale for all non-hovered cards
         cardMeshesRef.current.forEach(card => {
              if (card !== hoveredCard && !card.userData.isDragging) {
                  card.scale.set(1, 1, 1);
@@ -234,9 +231,9 @@ export default function AtomicCanvasClient() {
                 // Start dragging
                 draggedCardRef.current = hoveredCard;
                 hoveredCard.userData.isDragging = true;
-                pinchState.lastScreenPos = { x: screenX, y: screenY };
+                pinchState.lastScreenPos = { x: pinchScreenX, y: pinchScreenY };
              } else if (!draggedCardRef.current) {
-                // Hover effect
+                // Hover effect only if not dragging anything
                 hoveredCard.scale.set(1.15, 1.15, 1.15);
              }
         }
@@ -306,6 +303,15 @@ export default function AtomicCanvasClient() {
 
             if(rightHand) {
                  detectCardInteraction(rightHand, camera);
+                 window.drawConnectors(handsCtx, rightHand, window.HAND_CONNECTIONS, { color: '#FF7B00', lineWidth: 5 });
+                 window.drawLandmarks(handsCtx, rightHand, { color: '#07C1FF', lineWidth: 2, radius: 5 });
+            } else {
+                 // If no right hand, ensure we stop dragging
+                 if (draggedCardRef.current) {
+                    draggedCardRef.current.userData.isDragging = false;
+                    draggedCardRef.current = null;
+                 }
+                 pinchState.isPinching = false;
             }
 
             if (leftHand) {
@@ -335,10 +341,6 @@ export default function AtomicCanvasClient() {
               }
             } else {
                  previousLeftFist.current = null;
-            }
-             if (rightHand) {
-                window.drawConnectors(handsCtx, rightHand, window.HAND_CONNECTIONS, { color: '#FF7B00', lineWidth: 5 });
-                window.drawLandmarks(handsCtx, rightHand, { color: '#07C1FF', lineWidth: 2, radius: 5 });
             }
           } else {
             previousLeftFist.current = null;
@@ -410,3 +412,4 @@ export default function AtomicCanvasClient() {
       </div>
     </div>
   );
+}
