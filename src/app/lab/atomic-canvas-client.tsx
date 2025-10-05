@@ -195,8 +195,8 @@ export default function AtomicCanvasClient() {
             vector.unproject(camera);
             
             const dir = vector.sub(camera.position).normalize();
-            const distance = -camera.position.z / dir.z;
-            const newPos = camera.position.clone().add(dir.multiplyScalar(distance));
+            const dist = -camera.position.z / dir.z;
+            const newPos = camera.position.clone().add(dir.multiplyScalar(dist));
             
             draggedCardRef.current.position.x = newPos.x;
             draggedCardRef.current.position.y = newPos.y;
@@ -214,8 +214,7 @@ export default function AtomicCanvasClient() {
             const cardScreenX = ((projected.x + 1) / 2) * window.innerWidth;
             const cardScreenY = ((1 - projected.y) / 2) * window.innerHeight;
             
-            // Invert the incoming screenX for correct distance calculation
-            const dist = Math.hypot((1 - pinchX) * window.innerWidth - cardScreenX, screenY - cardScreenY);
+            const dist = Math.hypot(screenX - cardScreenX, screenY - cardScreenY);
 
             if (dist < 60 && dist < minDistance) {
                 minDistance = dist;
