@@ -57,11 +57,11 @@ export default function AtomicCanvasClient() {
   const previousLeftFist = useRef<{ x: number, y: number } | null>(null);
 
   const cardMeshesRef = useRef<THREE.Group[]>([]);
-  const selectedCardRef = useRef<THREE.Group | null>(null);
   const draggedCardRef = useRef<THREE.Group | null>(null);
   const pinchState = useRef({
     isPinching: false,
     startCoords: { x: 0, y: 0 },
+    lastScreenPos: { x: 0, y: 0 },
   }).current;
 
   useEffect(() => {
@@ -89,7 +89,7 @@ export default function AtomicCanvasClient() {
       const group = new THREE.Group();
       const cardGeometry = new THREE.BoxGeometry(1.8, 1.2, 0.15);
       const cardMaterial = new THREE.MeshLambertMaterial({
-        color: parseInt(elementData.color),
+        color: parseInt(elementData.color, 16),
         transparent: true,
         opacity: 0.9
       });
@@ -134,7 +134,7 @@ export default function AtomicCanvasClient() {
         ...elementData,
         title: symbol,
         originalPosition: { ...position },
-        isSelected: false
+        isDragging: false
       };
       return group;
     }
@@ -157,36 +157,41 @@ export default function AtomicCanvasClient() {
         const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
         const isPinchingNow = distance < 0.05;
 
-        const screenX = (1 - indexTip.x) * window.innerWidth;
-        const screenY = indexTip.y * window.innerHeight;
+        // Using middle of the pinch for screen coordinates
+        const pinchX = 1 - (indexTip.x + thumbTip.x) / 2;
+        const pinchY = (indexTip.y + thumbTip.y) / 2;
 
-        let isStartingPinch = isPinchingNow && !pinchState.isPinching;
-        let isEndingPinch = !isPinchingNow && pinchState.isPinching;
-        let dragDelta = null;
+        const screenX = pinchX * window.innerWidth;
+        const screenY = pinchY * window.innerHeight;
 
-        if (isPinchingNow) {
-            if (pinchState.isPinching) { // Dragging
-                 dragDelta = {
-                    deltaX: screenX - pinchState.startCoords.x,
-                    deltaY: screenY - pinchState.startCoords.y
-                };
-            }
-             pinchState.startCoords = { x: screenX, y: screenY };
-        }
-        pinchState.isPinching = isPinchingNow;
+        const isStartingPinch = isPinchingNow && !pinchState.isPinching;
+        const isEndingPinch = !isPinchingNow && pinchState.isPinching;
 
+        // Handle Ending Pinch (Drop)
         if (isEndingPinch && draggedCardRef.current) {
             draggedCardRef.current.userData.isDragging = false;
             draggedCardRef.current = null;
-            return null;
         }
 
-        if (dragDelta && draggedCardRef.current) {
+        pinchState.isPinching = isPinchingNow;
+
+        // Handle Dragging
+        if (draggedCardRef.current && isPinchingNow) {
+            const dragDelta = {
+                deltaX: screenX - pinchState.lastScreenPos.x,
+                deltaY: screenY - pinchState.lastScreenPos.y,
+            };
+
             const vector = new THREE.Vector3();
+            // Project card's position to screen space
             vector.copy(draggedCardRef.current.position);
             vector.project(camera);
-            vector.x -= dragDelta.deltaX / window.innerWidth * 2;
-            vector.y += dragDelta.deltaY / window.innerHeight * 2;
+
+            // Apply delta in screen space (NDC)
+            vector.x += dragDelta.deltaX / window.innerWidth * 2;
+            vector.y -= dragDelta.deltaY / window.innerHeight * 2;
+
+            // Unproject back to world space
             vector.unproject(camera);
             
             const dir = vector.sub(camera.position).normalize();
@@ -195,18 +200,22 @@ export default function AtomicCanvasClient() {
             
             draggedCardRef.current.position.x = newPos.x;
             draggedCardRef.current.position.y = newPos.y;
-
-            return draggedCardRef.current;
+            
+            pinchState.lastScreenPos = { x: screenX, y: screenY };
+            return;
         }
 
+        // Detect Hover and Start Pinch (Grab)
         let hoveredCard: THREE.Group | null = null;
         let minDistance = Infinity;
 
         cardMeshesRef.current.forEach(card => {
             const projected = card.position.clone().project(camera);
-            const cardX = ((projected.x + 1) / 2) * window.innerWidth;
-            const cardY = ((1 - projected.y) / 2) * window.innerHeight;
-            const dist = Math.hypot(screenX - cardX, screenY - cardY);
+            const cardScreenX = ((projected.x + 1) / 2) * window.innerWidth;
+            const cardScreenY = ((1 - projected.y) / 2) * window.innerHeight;
+            
+            // Invert the incoming screenX for correct distance calculation
+            const dist = Math.hypot((1 - pinchX) * window.innerWidth - cardScreenX, screenY - cardScreenY);
 
             if (dist < 60 && dist < minDistance) {
                 minDistance = dist;
@@ -214,22 +223,24 @@ export default function AtomicCanvasClient() {
             }
         });
 
+        // Reset scale for non-hovered cards
         cardMeshesRef.current.forEach(card => {
-            if (card !== hoveredCard && !card.userData.isDragging) {
-                card.scale.set(1, 1, 1);
-            }
+             if (card !== hoveredCard && !card.userData.isDragging) {
+                 card.scale.set(1, 1, 1);
+             }
         });
 
         if (hoveredCard) {
-            if (isStartingPinch) {
+             if (isStartingPinch && !draggedCardRef.current) {
+                // Start dragging
                 draggedCardRef.current = hoveredCard;
                 hoveredCard.userData.isDragging = true;
-                return hoveredCard;
-            } else if (!draggedCardRef.current) {
+                pinchState.lastScreenPos = { x: screenX, y: screenY };
+             } else if (!draggedCardRef.current) {
+                // Hover effect
                 hoveredCard.scale.set(1.15, 1.15, 1.15);
-            }
+             }
         }
-        return hoveredCard;
     }
 
 
