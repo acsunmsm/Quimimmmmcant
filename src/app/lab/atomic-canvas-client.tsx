@@ -97,7 +97,7 @@ export default function AtomicCanvasClient() {
     };
     
     const createBohrModel = (elementData: any) => {
-        if (!sceneRef.current) return;
+        if (!sceneRef.current || !elementData || !elementData.electrons) return;
         clearBohrModel();
 
         const modelGroup = new THREE.Group();
@@ -402,7 +402,7 @@ export default function AtomicCanvasClient() {
           handsCtx.save();
           handsCtx.clearRect(0, 0, handsCanvasEl.width, handsCanvasEl.height);
 
-          if (results.multiHandLandmarks && camera) {
+          if (results.multiHandLandmarks && cameraRef.current) {
              let leftHand = null, rightHand = null;
             if(results.multiHandedness){
               results.multiHandedness.forEach((handedness: any, i: number) => {
@@ -412,7 +412,7 @@ export default function AtomicCanvasClient() {
             }
 
             if(rightHand) {
-                 detectCardInteraction(rightHand, camera);
+                 detectCardInteraction(rightHand, cameraRef.current);
                  window.drawConnectors(handsCtx, rightHand, window.HAND_CONNECTIONS, { color: '#FF7B00', lineWidth: 5 });
                  window.drawLandmarks(handsCtx, rightHand, { color: '#07C1FF', lineWidth: 2, radius: 5 });
             } else {
@@ -431,10 +431,11 @@ export default function AtomicCanvasClient() {
                 const x = (1 - leftHand[9].x) * window.innerWidth;
                 const y = leftHand[9].y * window.innerHeight;
 
-                if (previousLeftFist.current && camera) {
+                if (previousLeftFist.current && cameraRef.current) {
                   const deltaX = x - previousLeftFist.current.x;
                   const deltaY = y - previousLeftFist.current.y;
-
+                  
+                  const camera = cameraRef.current;
                   const radius = camera.position.length();
                   const theta = Math.atan2(camera.position.x, camera.position.z) + deltaX * -0.005;
                   const phi = Math.atan2(camera.position.y, Math.sqrt(camera.position.x ** 2 + camera.position.z ** 2)) - deltaY * -0.005;
@@ -475,7 +476,9 @@ export default function AtomicCanvasClient() {
         const animate = () => {
           animationFrameId = requestAnimationFrame(animate);
           animateBohrModel();
-          renderer.render(scene, camera);
+          if (rendererRef.current && sceneRef.current && cameraRef.current) {
+            rendererRef.current.render(sceneRef.current, cameraRef.current);
+          }
         };
         animate();
 
