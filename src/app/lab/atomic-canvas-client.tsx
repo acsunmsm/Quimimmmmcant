@@ -97,6 +97,7 @@ export default function AtomicCanvasClient() {
     };
     
     const createBohrModel = (elementData: any) => {
+        if (!sceneRef.current) return;
         clearBohrModel();
 
         const modelGroup = new THREE.Group();
@@ -153,19 +154,23 @@ export default function AtomicCanvasClient() {
 
         modelGroup.rotation.x = -Math.PI / 8;
         modelGroup.rotation.y = -Math.PI / 8;
-        sceneRef.current?.add(modelGroup);
+        sceneRef.current.add(modelGroup);
     }
     
     const clearBohrModel = () => {
         const model = bohrModelRef.current;
-        if (model) {
-            sceneRef.current?.remove(model);
-            model.children.forEach((child: any) => {
-                child.geometry?.dispose();
+        if (model && sceneRef.current) {
+            sceneRef.current.remove(model);
+            model.traverse((child: any) => {
+                if (child.geometry) child.geometry.dispose();
                 if (child.material) {
-                    if (Array.isArray(child.material)) {
-                        child.material.forEach((mat: any) => mat.dispose());
+                     if (Array.isArray(child.material)) {
+                        child.material.forEach((mat: any) => {
+                            if (mat.map) mat.map.dispose();
+                            mat.dispose();
+                        });
                     } else {
+                        if (child.material.map) child.material.map.dispose();
                         child.material.dispose();
                     }
                 }
@@ -284,8 +289,8 @@ export default function AtomicCanvasClient() {
             vector.unproject(camera); 
             
             const dir = vector.sub(camera.position).normalize();
-            const distance = Math.abs(draggedCardRef.current.position.z - camera.position.z);
-            const newPos = camera.position.clone().add(dir.multiplyScalar(distance));
+            const distanceToCamera = draggedCardRef.current.position.distanceTo(camera.position);
+            const newPos = camera.position.clone().add(dir.multiplyScalar(distanceToCamera));
             
             draggedCardRef.current.position.x = newPos.x;
             draggedCardRef.current.position.y = newPos.y;
