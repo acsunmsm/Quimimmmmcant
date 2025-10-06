@@ -82,7 +82,7 @@ function StatsCard({ element }: { element: any | null }) {
                 </div>
                 <div>
                     <p className="font-semibold">Electrones</p>
-                    <p>{element.electrons.reduce((a: number,b: number) => a+b, 0)}</p>
+                    <p>{element.electrons ? element.electrons.reduce((a: number,b: number) => a+b, 0) : 'N/A'}</p>
                 </div>
                 <div>
                     <p className="font-semibold">Grupo</p>
@@ -147,9 +147,6 @@ export default function AtomicCanvasClient() {
 
         const modelGroup = new THREE.Group();
         bohrModelRef.current = modelGroup;
-
-        const width = window.innerWidth;
-        const height = window.innerHeight;
 
         const screenTopLeft = new THREE.Vector3(-1, 1, -1).unproject(cameraRef.current!);
         modelGroup.position.set(screenTopLeft.x + 2.5, screenTopLeft.y - 2, 0);
@@ -296,7 +293,6 @@ export default function AtomicCanvasClient() {
       group.add(cardMesh, edges, textMesh);
       group.userData = {
         ...elementData,
-        simbolo: symbol,
         originalPosition: { ...position },
         isDragging: false
       };
