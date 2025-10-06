@@ -162,16 +162,22 @@ export default function AtomicCanvasClient() {
         if (model && sceneRef.current) {
             sceneRef.current.remove(model);
             model.traverse((child: any) => {
-                if (child.geometry) child.geometry.dispose();
-                if (child.material) {
-                     if (Array.isArray(child.material)) {
-                        child.material.forEach((mat: any) => {
-                            if (mat.map) mat.map.dispose();
-                            mat.dispose();
-                        });
-                    } else {
-                        if (child.material.map) child.material.map.dispose();
-                        child.material.dispose();
+                if (child.isMesh) {
+                    child.geometry?.dispose();
+                    if (child.material) {
+                        if (Array.isArray(child.material)) {
+                            child.material.forEach((mat: THREE.Material) => {
+                                if ((mat as THREE.MeshBasicMaterial).map) {
+                                    (mat as THREE.MeshBasicMaterial).map.dispose();
+                                }
+                                mat.dispose();
+                            });
+                        } else {
+                            if ((child.material as THREE.MeshBasicMaterial).map) {
+                                (child.material as THREE.MeshBasicMaterial).map.dispose();
+                            }
+                            child.material.dispose();
+                        }
                     }
                 }
             });
