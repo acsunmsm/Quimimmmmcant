@@ -43,6 +43,17 @@ declare global {
 
 type Status = "loading" | "ready" | "error";
 
+const BOHR_MODEL_CONFIG = {
+    nucleusSize: 0.5,
+    nucleusColor: 0xaaaaaa,
+    electronSize: 0.15,
+    electronColor: 0x007bff,
+    orbitWidth: 0.02,
+    orbitColor: 0x888888,
+    baseOrbitRadius: 1.2,
+    orbitSpacing: 0.8
+};
+
 export default function AtomicCanvasClient() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const threeCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -51,6 +62,7 @@ export default function AtomicCanvasClient() {
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const bohrModelRef = useRef<THREE.Group | null>(null);
 
   const [status, setStatus] = useState<Status>("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
@@ -83,6 +95,100 @@ export default function AtomicCanvasClient() {
       const fingerTipIndices = [4, 8, 12, 16, 20];
       return fingerTipIndices.every(i => landmarks[i].y > landmarks[i - 2].y);
     };
+    
+    const createBohrModel = (elementData: any) => {
+        clearBohrModel();
+
+        const modelGroup = new THREE.Group();
+        bohrModelRef.current = modelGroup;
+        modelGroup.position.set(0, 3.5, 0);
+
+        const nucleusGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.nucleusSize, 32, 32);
+        const nucleusMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.nucleusColor });
+        const nucleus = new THREE.Mesh(nucleusGeometry, nucleusMaterial);
+        modelGroup.add(nucleus);
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d')!;
+        canvas.width = 512;
+        canvas.height = 512;
+        context.font = 'bold 100px Arial';
+        context.fillStyle = 'white';
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.fillText(elementData.title, canvas.width / 2, canvas.height / 2);
+        const texture = new THREE.CanvasTexture(canvas);
+        const textMaterial = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+        const textMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), textMaterial);
+        textMesh.position.set(0, 0, BOHR_MODEL_CONFIG.nucleusSize + 0.05);
+        modelGroup.add(textMesh);
+
+        let currentRadius = BOHR_MODEL_CONFIG.baseOrbitRadius;
+        elementData.electrons.forEach((numElectrons: number, shellIndex: number) => {
+            const orbitGeometry = new THREE.TorusGeometry(currentRadius, BOHR_MODEL_CONFIG.orbitWidth, 16, 100);
+            const orbitMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.orbitColor });
+            const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
+            orbit.rotation.x = Math.PI / 2;
+            modelGroup.add(orbit);
+
+            for (let i = 0; i < numElectrons; i++) {
+                const electronGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.electronSize, 16, 16);
+                const electronMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.electronColor });
+                const electron = new THREE.Mesh(electronGeometry, electronMaterial);
+
+                const angle = (i / numElectrons) * Math.PI * 2;
+                electron.position.set(
+                    Math.cos(angle) * currentRadius,
+                    0,
+                    Math.sin(angle) * currentRadius
+                );
+
+                electron.userData.orbitRadius = currentRadius;
+                electron.userData.initialAngle = angle;
+                electron.userData.orbitSpeed = 0.5 + (shellIndex * 0.2);
+                modelGroup.add(electron);
+            }
+            currentRadius += BOHR_MODEL_CONFIG.orbitSpacing;
+        });
+
+        modelGroup.rotation.x = -Math.PI / 8;
+        modelGroup.rotation.y = -Math.PI / 8;
+        sceneRef.current?.add(modelGroup);
+    }
+    
+    const clearBohrModel = () => {
+        const model = bohrModelRef.current;
+        if (model) {
+            sceneRef.current?.remove(model);
+            model.children.forEach((child: any) => {
+                child.geometry?.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach((mat: any) => mat.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
+        }
+        bohrModelRef.current = null;
+    }
+
+    const animateBohrModel = () => {
+        const model = bohrModelRef.current;
+        if (!model) return;
+
+        const time = Date.now() * 0.0005;
+        model.children.forEach((child: any) => {
+            if (child.userData.orbitRadius) {
+                const speed = child.userData.orbitSpeed;
+                const angle = child.userData.initialAngle + time * speed;
+                const radius = child.userData.orbitRadius;
+                child.position.x = Math.cos(angle) * radius;
+                child.position.z = Math.sin(angle) * radius;
+            }
+        });
+    }
 
     const createCard = (symbol: string, elementData: any, position: { x: number, y: number, z: number }) => {
       const group = new THREE.Group();
@@ -164,24 +270,21 @@ export default function AtomicCanvasClient() {
 
         pinchState.isPinching = isPinchingNow;
 
-        // --- Handle Dragging ---
         if (draggedCardRef.current && isPinchingNow) {
             const dragDeltaX = pinchScreenX - pinchState.lastScreenPos.x;
             const dragDeltaY = pinchScreenY - pinchState.lastScreenPos.y;
 
             const vector = new THREE.Vector3();
             vector.copy(draggedCardRef.current.position);
-            vector.project(camera); // screen-space position of the object (-1 to +1)
+            vector.project(camera); 
 
-            // Convert delta from screen pixels to NDC
             vector.x += (dragDeltaX / window.innerWidth) * 2;
             vector.y -= (dragDeltaY / window.innerHeight) * 2;
             
-            vector.unproject(camera); // convert back to world space
+            vector.unproject(camera); 
             
-            // Maintain original Z-distance from camera
             const dir = vector.sub(camera.position).normalize();
-            const distance = -camera.position.z / dir.z; 
+            const distance = Math.abs(draggedCardRef.current.position.z - camera.position.z);
             const newPos = camera.position.clone().add(dir.multiplyScalar(distance));
             
             draggedCardRef.current.position.x = newPos.x;
@@ -191,16 +294,14 @@ export default function AtomicCanvasClient() {
             return;
         }
 
-        // --- Handle End of Drag (Drop) ---
         if (isEndingPinch && draggedCardRef.current) {
             draggedCardRef.current.userData.isDragging = false;
             draggedCardRef.current = null;
+            clearBohrModel();
         }
 
-        // --- Detect Hover and Start of Drag (Grab) ---
         let hoveredCard: THREE.Group | null = null;
-        let minDistance = Infinity;
-
+        
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         mouse.x = (pinchScreenX / window.innerWidth) * 2 - 1;
@@ -219,7 +320,6 @@ export default function AtomicCanvasClient() {
             }
         }
         
-        // Reset scale for all non-hovered cards
         cardMeshesRef.current.forEach(card => {
              if (card !== hoveredCard && !card.userData.isDragging) {
                  card.scale.set(1, 1, 1);
@@ -228,12 +328,11 @@ export default function AtomicCanvasClient() {
 
         if (hoveredCard) {
              if (isStartingPinch && !draggedCardRef.current) {
-                // Start dragging
                 draggedCardRef.current = hoveredCard;
                 hoveredCard.userData.isDragging = true;
                 pinchState.lastScreenPos = { x: pinchScreenX, y: pinchScreenY };
+                createBohrModel(hoveredCard.userData);
              } else if (!draggedCardRef.current) {
-                // Hover effect only if not dragging anything
                 hoveredCard.scale.set(1.15, 1.15, 1.15);
              }
         }
@@ -306,10 +405,10 @@ export default function AtomicCanvasClient() {
                  window.drawConnectors(handsCtx, rightHand, window.HAND_CONNECTIONS, { color: '#FF7B00', lineWidth: 5 });
                  window.drawLandmarks(handsCtx, rightHand, { color: '#07C1FF', lineWidth: 2, radius: 5 });
             } else {
-                 // If no right hand, ensure we stop dragging
                  if (draggedCardRef.current) {
                     draggedCardRef.current.userData.isDragging = false;
                     draggedCardRef.current = null;
+                    clearBohrModel();
                  }
                  pinchState.isPinching = false;
             }
@@ -343,7 +442,13 @@ export default function AtomicCanvasClient() {
                  previousLeftFist.current = null;
             }
           } else {
+             if (draggedCardRef.current) {
+                draggedCardRef.current.userData.isDragging = false;
+                draggedCardRef.current = null;
+                clearBohrModel();
+            }
             previousLeftFist.current = null;
+            pinchState.isPinching = false;
           }
 
           handsCtx.restore();
@@ -358,6 +463,7 @@ export default function AtomicCanvasClient() {
 
         const animate = () => {
           animationFrameId = requestAnimationFrame(animate);
+          animateBohrModel();
           renderer.render(scene, camera);
         };
         animate();
