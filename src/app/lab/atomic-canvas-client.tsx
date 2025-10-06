@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useRef, useState } from "react";
@@ -5,6 +6,7 @@ import * as THREE from "three";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
 import data from "@/lib/elementos.json";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const ELEMENTOS_DATA = data.elementos.reduce((acc, el) => {
   acc[el.simbolo] = el;
@@ -54,6 +56,47 @@ const BOHR_MODEL_CONFIG = {
     orbitSpacing: 0.8
 };
 
+function StatsCard({ element }: { element: any | null }) {
+    if (!element) return null;
+
+    return (
+        <Card className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm border-gray-200/80 shadow-lg w-64">
+            <CardHeader>
+                <CardTitle className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold">{element.simbolo}</span>
+                    <span className="text-2xl font-semibold">{element.nombre}</span>
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                    <p className="font-semibold">Número Atómico</p>
+                    <p>{element.numeroAtomico}</p>
+                </div>
+                <div>
+                    <p className="font-semibold">Protones</p>
+                    <p>{element.protones}</p>
+                </div>
+                <div>
+                    <p className="font-semibold">Neutrones</p>
+                    <p>{element.neutrones}</p>
+                </div>
+                <div>
+                    <p className="font-semibold">Electrones</p>
+                    <p>{element.electrons.reduce((a: number,b: number) => a+b, 0)}</p>
+                </div>
+                <div>
+                    <p className="font-semibold">Grupo</p>
+                    <p>{element.grupo}</p>
+                </div>
+                <div>
+                    <p className="font-semibold">Periodo</p>
+                    <p>{element.periodo}</p>
+                </div>
+            </CardContent>
+        </Card>
+    );
+}
+
 export default function AtomicCanvasClient() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const threeCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -66,6 +109,8 @@ export default function AtomicCanvasClient() {
 
   const [status, setStatus] = useState<Status>("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
+  const [selectedElement, setSelectedElement] = useState<any | null>(null);
+
   const previousLeftFist = useRef<{ x: number, y: number } | null>(null);
 
   const cardMeshesRef = useRef<THREE.Group[]>([]);
@@ -102,7 +147,13 @@ export default function AtomicCanvasClient() {
 
         const modelGroup = new THREE.Group();
         bohrModelRef.current = modelGroup;
-        modelGroup.position.set(0, 3.5, 0);
+
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        const screenTopLeft = new THREE.Vector3(-1, 1, -1).unproject(cameraRef.current!);
+        modelGroup.position.set(screenTopLeft.x + 2.5, screenTopLeft.y - 2, 0);
+
 
         const nucleusGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.nucleusSize, 32, 32);
         const nucleusMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.nucleusColor });
@@ -117,7 +168,7 @@ export default function AtomicCanvasClient() {
         context.fillStyle = 'white';
         context.textAlign = 'center';
         context.textBaseline = 'middle';
-        context.fillText(elementData.title, canvas.width / 2, canvas.height / 2);
+        context.fillText(elementData.simbolo, canvas.width / 2, canvas.height / 2);
         const texture = new THREE.CanvasTexture(canvas);
         const textMaterial = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
         const textMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), textMaterial);
@@ -125,32 +176,34 @@ export default function AtomicCanvasClient() {
         modelGroup.add(textMesh);
 
         let currentRadius = BOHR_MODEL_CONFIG.baseOrbitRadius;
-        elementData.electrons.forEach((numElectrons: number, shellIndex: number) => {
-            const orbitGeometry = new THREE.TorusGeometry(currentRadius, BOHR_MODEL_CONFIG.orbitWidth, 16, 100);
-            const orbitMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.orbitColor });
-            const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
-            orbit.rotation.x = Math.PI / 2;
-            modelGroup.add(orbit);
+        if(elementData.electrons) {
+            elementData.electrons.forEach((numElectrons: number, shellIndex: number) => {
+                const orbitGeometry = new THREE.TorusGeometry(currentRadius, BOHR_MODEL_CONFIG.orbitWidth, 16, 100);
+                const orbitMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.orbitColor });
+                const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
+                orbit.rotation.x = Math.PI / 2;
+                modelGroup.add(orbit);
 
-            for (let i = 0; i < numElectrons; i++) {
-                const electronGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.electronSize, 16, 16);
-                const electronMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.electronColor });
-                const electron = new THREE.Mesh(electronGeometry, electronMaterial);
+                for (let i = 0; i < numElectrons; i++) {
+                    const electronGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.electronSize, 16, 16);
+                    const electronMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.electronColor });
+                    const electron = new THREE.Mesh(electronGeometry, electronMaterial);
 
-                const angle = (i / numElectrons) * Math.PI * 2;
-                electron.position.set(
-                    Math.cos(angle) * currentRadius,
-                    0,
-                    Math.sin(angle) * currentRadius
-                );
+                    const angle = (i / numElectrons) * Math.PI * 2;
+                    electron.position.set(
+                        Math.cos(angle) * currentRadius,
+                        0,
+                        Math.sin(angle) * currentRadius
+                    );
 
-                electron.userData.orbitRadius = currentRadius;
-                electron.userData.initialAngle = angle;
-                electron.userData.orbitSpeed = 0.5 + (shellIndex * 0.2);
-                modelGroup.add(electron);
-            }
-            currentRadius += BOHR_MODEL_CONFIG.orbitSpacing;
-        });
+                    electron.userData.orbitRadius = currentRadius;
+                    electron.userData.initialAngle = angle;
+                    electron.userData.orbitSpeed = 0.5 + (shellIndex * 0.2);
+                    modelGroup.add(electron);
+                }
+                currentRadius += BOHR_MODEL_CONFIG.orbitSpacing;
+            });
+        }
 
         modelGroup.rotation.x = -Math.PI / 8;
         modelGroup.rotation.y = -Math.PI / 8;
@@ -165,24 +218,19 @@ export default function AtomicCanvasClient() {
                 if (child.isMesh) {
                     child.geometry?.dispose();
                     if (child.material) {
-                        if (Array.isArray(child.material)) {
-                            child.material.forEach((mat: THREE.Material) => {
-                                if ((mat as THREE.MeshBasicMaterial).map) {
-                                    (mat as THREE.MeshBasicMaterial).map.dispose();
-                                }
-                                mat.dispose();
-                            });
-                        } else {
-                            if ((child.material as THREE.MeshBasicMaterial).map) {
-                                (child.material as THREE.MeshBasicMaterial).map.dispose();
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        materials.forEach((mat: THREE.Material) => {
+                            if ((mat as THREE.MeshBasicMaterial).map) {
+                                (mat as THREE.MeshBasicMaterial).map!.dispose();
                             }
-                            child.material.dispose();
-                        }
+                            mat.dispose();
+                        });
                     }
                 }
             });
+            bohrModelRef.current = null;
+            setSelectedElement(null);
         }
-        bohrModelRef.current = null;
     }
 
     const animateBohrModel = () => {
@@ -248,7 +296,7 @@ export default function AtomicCanvasClient() {
       group.add(cardMesh, edges, textMesh);
       group.userData = {
         ...elementData,
-        title: symbol,
+        simbolo: symbol,
         originalPosition: { ...position },
         isDragging: false
       };
@@ -342,6 +390,7 @@ export default function AtomicCanvasClient() {
                 draggedCardRef.current = hoveredCard;
                 hoveredCard.userData.isDragging = true;
                 pinchState.lastScreenPos = { x: pinchScreenX, y: pinchScreenY };
+                setSelectedElement(hoveredCard.userData);
                 createBohrModel(hoveredCard.userData);
              } else if (!draggedCardRef.current) {
                 hoveredCard.scale.set(1.15, 1.15, 1.15);
@@ -529,7 +578,10 @@ export default function AtomicCanvasClient() {
           ref={handsCanvasRef}
           className="absolute top-0 left-0 w-full h-full transform -scale-x-100 pointer-events-none"
         />
+        <StatsCard element={selectedElement} />
       </div>
     </div>
   );
 }
+
+    
