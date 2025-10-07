@@ -69,7 +69,7 @@ function BohrModelCanvas({ element }: { element: any | null }) {
     const modelRef = useRef<THREE.Group | null>(null);
 
     useEffect(() => {
-        if (!canvasRef.current || !element) return;
+        if (!canvasRef.current || !element || !element.electrons || !Array.isArray(element.electrons)) return;
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(50, canvasRef.current.width / canvasRef.current.height, 0.1, 100);
@@ -97,32 +97,31 @@ function BohrModelCanvas({ element }: { element: any | null }) {
         const nucleus = new THREE.Mesh(nucleusGeometry, nucleusMaterial);
         modelGroup.add(nucleus);
 
-        if (element.electrons && Array.isArray(element.electrons)) {
-            let currentRadius = BOHR_MODEL_CONFIG.baseOrbitRadius;
-            element.electrons.forEach((numElectrons: number, shellIndex: number) => {
-                const orbitGeometry = new THREE.TorusGeometry(currentRadius, BOHR_MODEL_CONFIG.orbitWidth, 16, 100);
-                const orbitMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.orbitColor });
-                const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
-                orbit.rotation.x = Math.PI / 2;
-                modelGroup.add(orbit);
+        
+        let currentRadius = BOHR_MODEL_CONFIG.baseOrbitRadius;
+        element.electrons.forEach((numElectrons: number, shellIndex: number) => {
+            const orbitGeometry = new THREE.TorusGeometry(currentRadius, BOHR_MODEL_CONFIG.orbitWidth, 16, 100);
+            const orbitMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.orbitColor });
+            const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
+            orbit.rotation.x = Math.PI / 2;
+            modelGroup.add(orbit);
 
-                for (let i = 0; i < numElectrons; i++) {
-                    const electronGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.electronSize, 16, 16);
-                    const electronMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.electronColor });
-                    const electron = new THREE.Mesh(electronGeometry, electronMaterial);
+            for (let i = 0; i < numElectrons; i++) {
+                const electronGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.electronSize, 16, 16);
+                const electronMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.electronColor });
+                const electron = new THREE.Mesh(electronGeometry, electronMaterial);
 
-                    const angle = (i / numElectrons) * Math.PI * 2;
-                    electron.position.set(Math.cos(angle) * currentRadius, 0, Math.sin(angle) * currentRadius);
-                    electron.userData = {
-                        orbitRadius: currentRadius,
-                        initialAngle: angle,
-                        orbitSpeed: 0.5 + (shellIndex * 0.2),
-                    };
-                    modelGroup.add(electron);
-                }
-                currentRadius += BOHR_MODEL_CONFIG.orbitSpacing;
-            });
-        }
+                const angle = (i / numElectrons) * Math.PI * 2;
+                electron.position.set(Math.cos(angle) * currentRadius, 0, Math.sin(angle) * currentRadius);
+                electron.userData = {
+                    orbitRadius: currentRadius,
+                    initialAngle: angle,
+                    orbitSpeed: 0.5 + (shellIndex * 0.2),
+                };
+                modelGroup.add(electron);
+            }
+            currentRadius += BOHR_MODEL_CONFIG.orbitSpacing;
+        });
         
         modelGroup.rotation.x = -Math.PI / 8;
         modelGroup.rotation.y = -Math.PI / 8;
@@ -209,7 +208,7 @@ function StatsCard({ element }: { element: any | null }) {
 function CombinationGuide({ hints, mixedElements }: { hints: CombinationHint[], mixedElements: any[] }) {
     if (mixedElements.length === 0) return null;
     return (
-        <Card className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-sm border-gray-200/80 shadow-lg w-full max-w-md z-20">
+        <Card className="absolute top-4 left-4 bg-white/80 backdrop-blur-sm border-gray-200/80 shadow-lg w-full max-w-sm z-20">
             <CardHeader>
                 <CardTitle className="text-xl">Guía de Combinación</CardTitle>
             </CardHeader>
@@ -591,7 +590,7 @@ export default function AtomicCanvasClient() {
 
           if (results.multiHandLandmarks && cameraRef.current) {
              let leftHand = null, rightHand = null;
-            if(results.multiHandedness.length){
+            if(results.multiHandedness.length > 0){
               results.multiHandedness.forEach((handedness: any, i: number) => {
                 if (handedness.label === 'Right') leftHand = results.multiHandLandmarks[i];
                 else rightHand = results.multiHandLandmarks[i];
@@ -752,3 +751,4 @@ export default function AtomicCanvasClient() {
 
     
 
+    
