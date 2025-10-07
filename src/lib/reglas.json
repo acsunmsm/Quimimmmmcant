@@ -1,0 +1,128 @@
+{
+  "reglas": [
+    {
+      "id": "regla_agua",
+      "reactivos": [
+        {"simbolo": "H", "cantidad": 2},
+        {"simbolo": "O", "cantidad": 1}
+      ],
+      "producto": "Agua (H2O)"
+    },
+    {
+      "id": "regla_dioxido_carbono",
+      "reactivos": [
+        {"simbolo": "C", "cantidad": 1},
+        {"simbolo": "O", "cantidad": 2}
+      ],
+      "producto": "Dióxido de Carbono (CO2)"
+    },
+    {
+      "id": "regla_monoxido_carbono",
+      "reactivos": [
+        {"simbolo": "C", "cantidad": 1},
+        {"simbolo": "O", "cantidad": 1}
+      ],
+      "producto": "Monóxido de Carbono (CO)"
+    },
+    {
+      "id": "regla_metano",
+      "reactivos": [
+        {"simbolo": "C", "cantidad": 1},
+        {"simbolo": "H", "cantidad": 4}
+      ],
+      "producto": "Metano (CH4)"
+    },
+    {
+      "id": "regla_amoniaco",
+      "reactivos": [
+        {"simbolo": "N", "cantidad": 1},
+        {"simbolo": "H", "cantidad": 3}
+      ],
+      "producto": "Amoníaco (NH3)"
+    },
+    {
+      "id": "regla_acido_clorhidrico",
+      "reactivos": [
+        {"simbolo": "H", "cantidad": 1},
+        {"simbolo": "Cl", "cantidad": 1}
+      ],
+      "producto": "Ácido Clorhídrico (HCl)"
+    },
+    {
+      "id": "regla_cloruro_sodio",
+      "reactivos": [
+        {"simbolo": "Na", "cantidad": 1},
+        {"simbolo": "Cl", "cantidad": 1}
+      ],
+      "producto": "Cloruro de Sodio (Sal)"
+    },
+    {
+      "id": "regla_oxido_sodio",
+      "reactivos": [
+        {"simbolo": "Na", "cantidad": 2},
+        {"simbolo": "O", "cantidad": 1}
+      ],
+      "producto": "Óxido de Sodio (Na2O)"
+    },
+    {
+      "id": "regla_oxido_magnesio",
+      "reactivos": [
+        {"simbolo": "Mg", "cantidad": 1},
+        {"simbolo": "O", "cantidad": 1}
+      ],
+      "producto": "Óxido de Magnesio (MgO)"
+    },
+    {
+      "id": "regla_oxido_aluminio",
+      "reactivos": [
+        {"simbolo": "Al", "cantidad": 2},
+        {"simbolo": "O", "cantidad": 3}
+      ],
+      "producto": "Óxido de Aluminio (Al2O3)"
+    },
+    {
+      "id": "regla_dioxido_silicio",
+      "reactivos": [
+        {"simbolo": "Si", "cantidad": 1},
+        {"simbolo": "O", "cantidad": 2}
+      ],
+      "producto": "Dióxido de Silicio (SiO2)"
+    },
+    {
+      "id": "regla_acido_fosforico",
+      "reactivos": [
+        {"simbolo": "H", "cantidad": 3},
+        {"simbolo": "P", "cantidad": 1},
+        {"simbolo": "O", "cantidad": 4}
+      ],
+      "producto": "Ácido Fosfórico (H3PO4)"
+    },
+    {
+      "id": "regla_acido_sulfurico",
+      "reactivos": [
+        {"simbolo": "H", "cantidad": 2},
+        {"simbolo": "S", "cantidad": 1},
+        {"simbolo": "O", "cantidad": 4}
+      ],
+      "producto": "Ácido Sulfúrico (H2SO4)"
+    },
+    {
+      "id": "regla_fluoruro_hidrogeno",
+      "reactivos": [
+        {"simbolo": "H", "cantidad": 1},
+        {"simbolo": "F", "cantidad": 1}
+      ],
+      "producto": "Fluoruro de Hidrógeno (HF)"
+    },
+    {
+      "id": "regla_trioxido_azufre",
+      "reactivos": [
+        {"simbolo": "S", "cantidad": 1},
+        {"simbolo": "O", "cantidad": 3}
+      ],
+      "producto": "Trióxido de Azufre (SO3)"
+    }
+  ]
+}
+
+    

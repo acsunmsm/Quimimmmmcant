@@ -4,9 +4,12 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal } from "lucide-react";
+import { CheckCircle, FlaskConical, Terminal } from "lucide-react";
 import data from "@/lib/elementos.json";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import combinationRules from "@/lib/reglas.json";
 
 const ELEMENTOS_DATA = data.elementos.reduce((acc, el) => {
   acc[el.simbolo] = el;
@@ -44,6 +47,11 @@ declare global {
 }
 
 type Status = "loading" | "ready" | "error";
+type CombinationHint = {
+    producto: string;
+    faltantes: { simbolo: string; cantidad: number }[];
+};
+
 
 const BOHR_MODEL_CONFIG = {
     nucleusSize: 0.5,
@@ -97,6 +105,30 @@ function StatsCard({ element }: { element: any | null }) {
     );
 }
 
+function CombinationGuide({ hints, mixedElements }: { hints: CombinationHint[], mixedElements: any[] }) {
+    if (mixedElements.length === 0) return null;
+    return (
+        <Card className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-sm border-gray-200/80 shadow-lg w-full max-w-md">
+            <CardHeader>
+                <CardTitle className="text-xl">Guía de Combinación</CardTitle>
+            </CardHeader>
+            <CardContent>
+                {hints.length > 0 ? (
+                    <ul className="space-y-2">
+                        {hints.map(hint => (
+                            <li key={hint.producto} className="text-sm">
+                                Para formar <span className="font-bold">{hint.producto.replace(/_/g, ' ')}</span>, necesitas: {hint.faltantes.map(f => `${f.cantidad}x ${f.simbolo}`).join(', ')}
+                            </li>
+                        ))}
+                    </ul>
+                ) : (
+                    <p className="text-sm text-muted-foreground">No hay combinaciones conocidas para los elementos actuales.</p>
+                )}
+            </CardContent>
+        </Card>
+    )
+}
+
 export default function AtomicCanvasClient() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const threeCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -106,10 +138,15 @@ export default function AtomicCanvasClient() {
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const bohrModelRef = useRef<THREE.Group | null>(null);
+  const combinationAreaRef = useRef<THREE.Mesh | null>(null);
 
   const [status, setStatus] = useState<Status>("loading");
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [selectedElement, setSelectedElement] = useState<any | null>(null);
+  const [mixedElements, setMixedElements] = useState<any[]>([]);
+  const [combinationHints, setCombinationHints] = useState<CombinationHint[]>([]);
+  const { toast } = useToast();
+
 
   const previousLeftFist = useRef<{ x: number, y: number } | null>(null);
 
@@ -119,6 +156,66 @@ export default function AtomicCanvasClient() {
     isPinching: false,
     lastScreenPos: { x: 0, y: 0 },
   }).current;
+
+    const checkCombinations = (currentElements: any[]) => {
+        const counts: { [key: string]: number } = currentElements.reduce((acc, el) => {
+            acc[el.simbolo] = (acc[el.simbolo] || 0) + 1;
+            return acc;
+        }, {});
+
+        for (const rule of combinationRules.reglas) {
+            const isMatch = rule.reactivos.every(
+                (r) => (counts[r.simbolo] || 0) === r.cantidad
+            ) && rule.reactivos.length === Object.keys(counts).length;
+
+            if (isMatch) {
+                toast({
+                    title: "¡Molécula Formada!",
+                    description: `Has creado ${rule.producto.replace(/_/g, ' ')}.`,
+                    action: <div className="p-2 rounded-full bg-green-500"><CheckCircle className="text-white" /></div>
+                });
+                setMixedElements([]);
+                setCombinationHints([]);
+                break;
+            }
+        }
+    }
+
+
+    const updateCombinationHints = (currentElements: any[]) => {
+        if (currentElements.length === 0) {
+            setCombinationHints([]);
+            return;
+        }
+
+        const counts: { [key: string]: number } = currentElements.reduce((acc, el) => {
+            acc[el.simbolo] = (acc[el.simbolo] || 0) + 1;
+            return acc;
+        }, {});
+
+        const hints: CombinationHint[] = [];
+        combinationRules.reglas.forEach(rule => {
+            const ruleCounts: { [key: string]: number } = rule.reactivos.reduce((acc, r) => {
+                acc[r.simbolo] = r.cantidad;
+                return acc;
+            }, {} as { [key: string]: number });
+
+            const isPartialMatch = Object.keys(counts).every(simbolo => ruleCounts[simbolo] >= counts[simbolo]);
+
+            if (isPartialMatch) {
+                const faltantes = rule.reactivos.map(r => ({
+                    simbolo: r.simbolo,
+                    cantidad: r.cantidad - (counts[r.simbolo] || 0)
+                })).filter(f => f.cantidad > 0);
+
+                if (faltantes.length > 0 && faltantes.length < rule.reactivos.length) {
+                    hints.push({ producto: rule.producto, faltantes });
+                }
+            }
+        });
+        setCombinationHints(hints);
+    }
+
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -142,21 +239,22 @@ export default function AtomicCanvasClient() {
     };
     
     const createBohrModel = (elementData: any) => {
-        if (!sceneRef.current || !elementData || !elementData.electrons) return;
+        if (!sceneRef.current || !elementData) return;
         clearBohrModel();
-
+    
         const modelGroup = new THREE.Group();
         bohrModelRef.current = modelGroup;
-
+    
+        // Position at top left
         const screenTopLeft = new THREE.Vector3(-1, 1, -1).unproject(cameraRef.current!);
-        modelGroup.position.set(screenTopLeft.x + 2.5, screenTopLeft.y - 2, 0);
-
-
+        modelGroup.position.set(screenTopLeft.x + 2.5, screenTopLeft.y - 2.5, 0);
+    
+    
         const nucleusGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.nucleusSize, 32, 32);
         const nucleusMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.nucleusColor });
         const nucleus = new THREE.Mesh(nucleusGeometry, nucleusMaterial);
         modelGroup.add(nucleus);
-
+    
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d')!;
         canvas.width = 512;
@@ -171,7 +269,7 @@ export default function AtomicCanvasClient() {
         const textMesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), textMaterial);
         textMesh.position.set(0, 0, BOHR_MODEL_CONFIG.nucleusSize + 0.05);
         modelGroup.add(textMesh);
-
+    
         let currentRadius = BOHR_MODEL_CONFIG.baseOrbitRadius;
         if(elementData.electrons) {
             elementData.electrons.forEach((numElectrons: number, shellIndex: number) => {
@@ -180,19 +278,19 @@ export default function AtomicCanvasClient() {
                 const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
                 orbit.rotation.x = Math.PI / 2;
                 modelGroup.add(orbit);
-
+    
                 for (let i = 0; i < numElectrons; i++) {
                     const electronGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.electronSize, 16, 16);
                     const electronMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.electronColor });
                     const electron = new THREE.Mesh(electronGeometry, electronMaterial);
-
+    
                     const angle = (i / numElectrons) * Math.PI * 2;
                     electron.position.set(
                         Math.cos(angle) * currentRadius,
                         0,
                         Math.sin(angle) * currentRadius
                     );
-
+    
                     electron.userData.orbitRadius = currentRadius;
                     electron.userData.initialAngle = angle;
                     electron.userData.orbitSpeed = 0.5 + (shellIndex * 0.2);
@@ -201,7 +299,7 @@ export default function AtomicCanvasClient() {
                 currentRadius += BOHR_MODEL_CONFIG.orbitSpacing;
             });
         }
-
+    
         modelGroup.rotation.x = -Math.PI / 8;
         modelGroup.rotation.y = -Math.PI / 8;
         sceneRef.current.add(modelGroup);
@@ -350,7 +448,22 @@ export default function AtomicCanvasClient() {
         }
 
         if (isEndingPinch && draggedCardRef.current) {
+            const combinationArea = combinationAreaRef.current;
+            if (combinationArea) {
+                const cardBox = new THREE.Box3().setFromObject(draggedCardRef.current);
+                const areaBox = new THREE.Box3().setFromObject(combinationArea);
+                if (cardBox.intersectsBox(areaBox)) {
+                    const newMixedElements = [...mixedElements, draggedCardRef.current.userData];
+                    setMixedElements(newMixedElements);
+                    updateCombinationHints(newMixedElements);
+                    checkCombinations(newMixedElements);
+                }
+            }
+
             draggedCardRef.current.userData.isDragging = false;
+            // Snap back
+            const originalPos = draggedCardRef.current.userData.originalPosition;
+            draggedCardRef.current.position.set(originalPos.x, originalPos.y, originalPos.z);
             draggedCardRef.current = null;
             clearBohrModel();
         }
@@ -440,6 +553,14 @@ export default function AtomicCanvasClient() {
         
         createCards(scene);
 
+        // Create Combination Area
+        const comboAreaGeometry = new THREE.BoxGeometry(4, 2, 0.2);
+        const comboAreaMaterial = new THREE.MeshBasicMaterial({ color: 0x007bff, transparent: true, opacity: 0.3 });
+        const comboAreaMesh = new THREE.Mesh(comboAreaGeometry, comboAreaMaterial);
+        comboAreaMesh.position.set(0, 3.5, 0);
+        scene.add(comboAreaMesh);
+        combinationAreaRef.current = comboAreaMesh;
+
         hands = new window.Hands({ locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
         hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
 
@@ -463,6 +584,8 @@ export default function AtomicCanvasClient() {
             } else {
                  if (draggedCardRef.current) {
                     draggedCardRef.current.userData.isDragging = false;
+                    const originalPos = draggedCardRef.current.userData.originalPosition;
+                    draggedCardRef.current.position.set(originalPos.x, originalPos.y, originalPos.z);
                     draggedCardRef.current = null;
                     clearBohrModel();
                  }
@@ -501,6 +624,8 @@ export default function AtomicCanvasClient() {
           } else {
              if (draggedCardRef.current) {
                 draggedCardRef.current.userData.isDragging = false;
+                const originalPos = draggedCardRef.current.userData.originalPosition;
+                draggedCardRef.current.position.set(originalPos.x, originalPos.y, originalPos.z);
                 draggedCardRef.current = null;
                 clearBohrModel();
             }
@@ -545,7 +670,7 @@ export default function AtomicCanvasClient() {
     init();
 
     return cleanup;
-  }, []);
+  }, [mixedElements, toast]);
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center">
@@ -575,9 +700,24 @@ export default function AtomicCanvasClient() {
           className="absolute top-0 left-0 w-full h-full transform -scale-x-100 pointer-events-none"
         />
         <StatsCard element={selectedElement} />
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-6 py-2 rounded-lg flex items-center gap-2">
+            <FlaskConical />
+            <p className="font-bold text-lg">Espacio de Combinación</p>
+            <div className="flex gap-2 ml-4">
+                {mixedElements.map((el, i) => (
+                    <span key={i} className="bg-white/30 text-black font-bold px-2 py-1 rounded-md text-sm">{el.simbolo}</span>
+                ))}
+            </div>
+            {mixedElements.length > 0 && (
+                <Button variant="destructive" size="sm" onClick={() => { setMixedElements([]); setCombinationHints([]); }}>Limpiar</Button>
+            )}
+        </div>
+        <CombinationGuide hints={combinationHints} mixedElements={mixedElements} />
       </div>
     </div>
   );
 }
+
+    
 
     
