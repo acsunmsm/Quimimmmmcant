@@ -55,9 +55,9 @@ type CombinationHint = {
 
 const BOHR_MODEL_CONFIG = {
     nucleusSize: 0.5,
-    nucleusColor: 0xaaaaaa,
+    nucleusColor: 0xff5555,
     electronSize: 0.15,
-    electronColor: 0x007bff,
+    electronColor: 0x00aaff,
     orbitWidth: 0.02,
     orbitColor: 0x888888,
     baseOrbitRadius: 1.2,
@@ -328,7 +328,6 @@ export default function AtomicCanvasClient() {
     let hands: any;
     let mpCamera: any;
     
-    // This holds a reference to the latest mixedElements, for use inside the animation loop
     const mixedElementsRef = React.createRef<any[]>();
     mixedElementsRef.current = mixedElements;
 
