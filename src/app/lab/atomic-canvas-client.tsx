@@ -161,6 +161,7 @@ function BohrModelCanvas({ element }: { element: any | null }) {
                     }
                 }
             });
+            if(modelRef.current) scene.remove(modelRef.current);
         };
     }, [element]);
 
@@ -327,6 +328,7 @@ export default function AtomicCanvasClient() {
     let hands: any;
     let mpCamera: any;
     
+    // This holds a reference to the latest mixedElements, for use inside the animation loop
     const mixedElementsRef = React.createRef<any[]>();
     mixedElementsRef.current = mixedElements;
 
@@ -418,11 +420,9 @@ export default function AtomicCanvasClient() {
         const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
         const isPinchingNow = distance < 0.05;
 
-        // Use the middle of the pinch gesture for screen coordinates
         const pinchXNormalized = (indexTip.x + thumbTip.x) / 2;
         const pinchYNormalized = (indexTip.y + thumbTip.y) / 2;
         
-        // Correct for flipped video
         const screenX = (1 - pinchXNormalized) * window.innerWidth;
         const screenY = pinchYNormalized * window.innerHeight;
 
@@ -483,7 +483,6 @@ export default function AtomicCanvasClient() {
         let hoveredCard: THREE.Group | null = null;
         
         const raycaster = new THREE.Raycaster();
-        // Use corrected NDC coordinates
         const mouse = new THREE.Vector2(
             (1 - pinchXNormalized) * 2 - 1,
             -pinchYNormalized * 2 + 1
@@ -516,7 +515,10 @@ export default function AtomicCanvasClient() {
                 setSelectedElement(hoveredCard.userData);
              } else if (!draggedCardRef.current) {
                 hoveredCard.scale.set(1.15, 1.15, 1.15);
+                setSelectedElement(hoveredCard.userData);
              }
+        } else if (!draggedCardRef.current) {
+            setSelectedElement(null);
         }
     }
 
@@ -748,3 +750,5 @@ export default function AtomicCanvasClient() {
     </div>
   );
 }
+
+    
