@@ -90,7 +90,7 @@ function StatsCard({ element }: { element: any | null }) {
                 </div>
                 <div>
                     <p className="font-semibold">Electrones</p>
-                    <p>{element.electrons ? element.electrons.reduce((a: number,b: number) => a+b, 0) : 'N/A'}</p>
+                    <p>{element.electrons && Array.isArray(element.electrons) ? element.electrons.reduce((a: number,b: number) => a+b, 0) : 'N/A'}</p>
                 </div>
                 <div>
                     <p className="font-semibold">Grupo</p>
@@ -164,9 +164,13 @@ export default function AtomicCanvasClient() {
         }, {});
 
         for (const rule of combinationRules.reglas) {
-            const isMatch = rule.reactivos.every(
-                (r) => (counts[r.simbolo] || 0) === r.cantidad
-            ) && rule.reactivos.length === Object.keys(counts).length;
+            const requiredCounts: { [key: string]: number } = rule.reactivos.reduce((acc, r) => {
+                acc[r.simbolo] = r.cantidad;
+                return acc;
+            }, {} as { [key: string]: number });
+
+            const isMatch = Object.keys(requiredCounts).length === Object.keys(counts).length &&
+                Object.keys(requiredCounts).every(simbolo => counts[simbolo] === requiredCounts[simbolo]);
 
             if (isMatch) {
                 toast({
@@ -208,7 +212,7 @@ export default function AtomicCanvasClient() {
                     cantidad: r.cantidad - (counts[r.simbolo] || 0)
                 })).filter(f => f.cantidad > 0);
 
-                if (faltantes.length > 0 && faltantes.length < rule.reactivos.length) {
+                if (faltantes.length > 0 && faltantes.length < rule.reactivos.length + Object.keys(counts).length) {
                     hints.push({ producto: rule.producto, faltantes });
                 }
             }
@@ -223,6 +227,10 @@ export default function AtomicCanvasClient() {
     let animationFrameId: number;
     let hands: any;
     let mpCamera: any;
+    
+    // This holds a reference to the latest mixedElements, for use inside the animation loop
+    const mixedElementsRef = React.createRef<any[]>();
+    mixedElementsRef.current = mixedElements;
 
     const cleanup = () => {
       cancelAnimationFrame(animationFrameId);
@@ -247,7 +255,6 @@ export default function AtomicCanvasClient() {
         const modelGroup = new THREE.Group();
         bohrModelRef.current = modelGroup;
     
-        // Position at top left
         const screenTopLeft = new THREE.Vector3(-1, 1, -1).unproject(cameraRef.current!);
         modelGroup.position.set(screenTopLeft.x + 2.5, screenTopLeft.y - 2.5, 0);
     
@@ -272,8 +279,8 @@ export default function AtomicCanvasClient() {
         textMesh.position.set(0, 0, BOHR_MODEL_CONFIG.nucleusSize + 0.05);
         modelGroup.add(textMesh);
     
-        let currentRadius = BOHR_MODEL_CONFIG.baseOrbitRadius;
         if(elementData.electrons && Array.isArray(elementData.electrons)) {
+            let currentRadius = BOHR_MODEL_CONFIG.baseOrbitRadius;
             elementData.electrons.forEach((numElectrons: number, shellIndex: number) => {
                 const orbitGeometry = new THREE.TorusGeometry(currentRadius, BOHR_MODEL_CONFIG.orbitWidth, 16, 100);
                 const orbitMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.orbitColor });
@@ -315,19 +322,17 @@ export default function AtomicCanvasClient() {
                 if (child.isMesh) {
                     child.geometry?.dispose();
                     if (child.material) {
-                        const materials = Array.isArray(child.material) ? child.material : [child.material];
-                        materials.forEach((mat: THREE.Material) => {
-                            if ((mat as any).map) {
-                                (mat as any).map!.dispose();
-                            }
-                            mat.dispose();
-                        });
+                         const materials = Array.isArray(child.material) ? child.material : [child.material];
+                         materials.forEach((mat: any) => {
+                             if (mat.map) mat.map.dispose();
+                             mat.dispose();
+                         });
                     }
                 }
             });
             bohrModelRef.current = null;
-            setSelectedElement(null);
         }
+        setSelectedElement(null);
     }
 
     const animateBohrModel = () => {
@@ -411,7 +416,8 @@ export default function AtomicCanvasClient() {
       });
     }
     
-    const detectCardInteraction = (handLandmarks: any, camera: THREE.Camera, currentMixedElements: any[]) => {
+    const detectCardInteraction = (handLandmarks: any, camera: THREE.Camera) => {
+        const currentMixedElements = mixedElementsRef.current || [];
         const indexTip = handLandmarks[8];
         const thumbTip = handLandmarks[4];
         const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
@@ -544,11 +550,11 @@ export default function AtomicCanvasClient() {
         
         const worldWidth = 14; 
         const worldHeight = 8; 
-        const distance = Math.max(
+        camera.position.z = Math.max(
           worldWidth / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2) * camera.aspect)),
           worldHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)))
         ) + 2;
-        camera.position.z = distance;
+
 
         const renderer = new THREE.WebGLRenderer({ canvas: threeCanvasEl, alpha: true });
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -573,31 +579,29 @@ export default function AtomicCanvasClient() {
 
         hands = new window.Hands({ locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
         hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
-
-        let currentMixedElements = mixedElements;
-        const mixedElementsSub = (newElements: any[]) => {
-            currentMixedElements = newElements;
-        }
-        setMixedElements(prev => {
-            mixedElementsSub(prev);
-            return prev;
-        });
-
+        
         hands.onResults((results: any) => {
           handsCtx.save();
           handsCtx.clearRect(0, 0, handsCanvasEl.width, handsCanvasEl.height);
 
           if (results.multiHandLandmarks && cameraRef.current) {
              let leftHand = null, rightHand = null;
-            if(results.multiHandedness){
+            if(results.multiHandedness.length){
               results.multiHandedness.forEach((handedness: any, i: number) => {
                 if (handedness.label === 'Right') leftHand = results.multiHandLandmarks[i];
                 else rightHand = results.multiHandLandmarks[i];
               });
+            } else if (results.multiHandLandmarks.length > 0) {
+              // Fallback if handedness is not available
+              rightHand = results.multiHandLandmarks[0];
+              if(results.multiHandLandmarks.length > 1) {
+                  leftHand = results.multiHandLandmarks[1];
+              }
             }
 
+
             if(rightHand) {
-                 detectCardInteraction(rightHand, cameraRef.current, currentMixedElements);
+                 detectCardInteraction(rightHand, cameraRef.current);
                  window.drawConnectors(handsCtx, rightHand, window.HAND_CONNECTIONS, { color: '#FF7B00', lineWidth: 5 });
                  window.drawLandmarks(handsCtx, rightHand, { color: '#07C1FF', lineWidth: 2, radius: 5 });
             } else {
@@ -689,7 +693,7 @@ export default function AtomicCanvasClient() {
     init();
 
     return cleanup;
-  }, []); // Removed mixedElements from dependencies
+  }, [mixedElements]); 
 
   const handleClearMixedElements = () => {
     setMixedElements([]);
