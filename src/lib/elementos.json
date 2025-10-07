@@ -6,10 +6,7 @@
       "nombre": "Hidrógeno",
       "protones": 1,
       "neutrones": 0,
-      "electrones": [1],
-      "electronesValencia": 1,
-      "grupo": 1,
-      "periodo": 1,
+      "electrones": 1,
       "color": "0xffffff"
     },
     {
@@ -18,10 +15,7 @@
       "nombre": "Helio",
       "protones": 2,
       "neutrones": 2,
-      "electrones": [2],
-      "electronesValencia": 2,
-      "grupo": 18,
-      "periodo": 1,
+      "electrones": 2,
       "color": "0xd9ffff"
     },
     {
@@ -30,10 +24,7 @@
       "nombre": "Litio",
       "protones": 3,
       "neutrones": 4,
-      "electrones": [2, 1],
-      "electronesValencia": 1,
-      "grupo": 1,
-      "periodo": 2,
+      "electrones": 3,
       "color": "0xcc80ff"
     },
     {
@@ -42,10 +33,7 @@
       "nombre": "Berilio",
       "protones": 4,
       "neutrones": 5,
-      "electrones": [2, 2],
-      "electronesValencia": 2,
-      "grupo": 2,
-      "periodo": 2,
+      "electrones": 4,
       "color": "0xc2ff00"
     },
     {
@@ -54,10 +42,7 @@
       "nombre": "Boro",
       "protones": 5,
       "neutrones": 6,
-      "electrones": [2, 3],
-      "electronesValencia": 3,
-      "grupo": 13,
-      "periodo": 2,
+      "electrones": 5,
       "color": "0xffb5b5"
     },
     {
@@ -66,10 +51,7 @@
       "nombre": "Carbono",
       "protones": 6,
       "neutrones": 6,
-      "electrones": [2, 4],
-      "electronesValencia": 4,
-      "grupo": 14,
-      "periodo": 2,
+      "electrones": 6,
       "color": "0x909090"
     },
     {
@@ -78,10 +60,7 @@
       "nombre": "Nitrógeno",
       "protones": 7,
       "neutrones": 7,
-      "electrones": [2, 5],
-      "electronesValencia": 5,
-      "grupo": 15,
-      "periodo": 2,
+      "electrones": 7,
       "color": "0x3050ff"
     },
     {
@@ -90,10 +69,7 @@
       "nombre": "Oxígeno",
       "protones": 8,
       "neutrones": 8,
-      "electrones": [2, 6],
-      "electronesValencia": 6,
-      "grupo": 16,
-      "periodo": 2,
+      "electrones": 8,
       "color": "0xff0d0d"
     },
     {
@@ -102,10 +78,7 @@
       "nombre": "Flúor",
       "protones": 9,
       "neutrones": 10,
-      "electrones": [2, 7],
-      "electronesValencia": 7,
-      "grupo": 17,
-      "periodo": 2,
+      "electrones": 9,
       "color": "0x90e050"
     },
     {
@@ -114,10 +87,7 @@
       "nombre": "Sodio",
       "protones": 11,
       "neutrones": 12,
-      "electrones": [2, 8, 1],
-      "electronesValencia": 1,
-      "grupo": 1,
-      "periodo": 3,
+      "electrones": 11,
       "color": "0xab5cf2"
     },
     {
@@ -126,10 +96,7 @@
       "nombre": "Magnesio",
       "protones": 12,
       "neutrones": 12,
-      "electrones": [2, 8, 2],
-      "electronesValencia": 2,
-      "grupo": 2,
-      "periodo": 3,
+      "electrones": 12,
       "color": "0x8aff00"
     },
     {
@@ -138,10 +105,7 @@
       "nombre": "Aluminio",
       "protones": 13,
       "neutrones": 14,
-      "electrones": [2, 8, 3],
-      "electronesValencia": 3,
-      "grupo": 13,
-      "periodo": 3,
+      "electrones": 13,
       "color": "0xbfa6a6"
     },
     {
@@ -150,10 +114,7 @@
       "nombre": "Silicio",
       "protones": 14,
       "neutrones": 14,
-      "electrones": [2, 8, 4],
-      "electronesValencia": 4,
-      "grupo": 14,
-      "periodo": 3,
+      "electrones": 14,
       "color": "0xf0c8a0"
     },
     {
@@ -162,10 +123,7 @@
       "nombre": "Fósforo",
       "protones": 15,
       "neutrones": 16,
-      "electrones": [2, 8, 5],
-      "electronesValencia": 5,
-      "grupo": 15,
-      "periodo": 3,
+      "electrones": 15,
       "color": "0xff8000"
     },
     {
@@ -174,10 +132,7 @@
       "nombre": "Azufre",
       "protones": 16,
       "neutrones": 16,
-      "electrones": [2, 8, 6],
-      "electronesValencia": 6,
-      "grupo": 16,
-      "periodo": 3,
+      "electrones": 16,
       "color": "0xffff30"
     },
     {
@@ -186,10 +141,7 @@
       "nombre": "Cloro",
       "protones": 17,
       "neutrones": 18,
-      "electrones": [2, 8, 7],
-      "electronesValencia": 7,
-      "grupo": 17,
-      "periodo": 3,
+      "electrones": 17,
       "color": "0x1ff01f"
     }
   ]

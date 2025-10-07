@@ -598,9 +598,6 @@ export default function AtomicCanvasClient() {
               });
             } else if (results.multiHandLandmarks.length > 0) {
               rightHand = results.multiHandLandmarks[0];
-              if(results.multiHandLandmarks.length > 1) {
-                  leftHand = results.multiHandLandmarks[1];
-              }
             }
 
 
