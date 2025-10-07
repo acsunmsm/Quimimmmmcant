@@ -11,10 +11,10 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import combinationRules from "@/lib/reglas.json";
 
-const ELEMENTOS_DATA = data.elementos.reduce((acc, el) => {
-  acc[el.simbolo] = el;
-  return acc;
-}, {} as any);
+const ELEMENTOS_DATA: { [key: string]: any } = {};
+data.elementos.forEach(el => {
+    ELEMENTOS_DATA[el.simbolo] = el;
+});
 
 
 const CARD_POSITIONS: { [key: string]: { x: number, y: number, z: number } } = {
@@ -64,12 +64,28 @@ const BOHR_MODEL_CONFIG = {
     orbitSpacing: 0.8
 };
 
+function calculateElectronShells(numElectrons: number): number[] {
+    const shells: number[] = [];
+    let remainingElectrons = numElectrons;
+    let n = 1;
+    while (remainingElectrons > 0) {
+        const capacity = 2 * n * n;
+        const electronsInShell = Math.min(remainingElectrons, capacity);
+        shells.push(electronsInShell);
+        remainingElectrons -= electronsInShell;
+        n++;
+    }
+    return shells;
+}
+
 function BohrModelCanvas({ element }: { element: any | null }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const modelRef = useRef<THREE.Group | null>(null);
 
     useEffect(() => {
-        if (!canvasRef.current || !element || !element.electrons || !Array.isArray(element.electrons)) return;
+        if (!canvasRef.current || !element || typeof element.electrones !== 'number') return;
+
+        const electronShells = calculateElectronShells(element.electrones);
 
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(50, canvasRef.current.width / canvasRef.current.height, 0.1, 100);
@@ -84,7 +100,6 @@ function BohrModelCanvas({ element }: { element: any | null }) {
         directionalLight.position.set(5, 10, 7.5);
         scene.add(directionalLight);
 
-        // Clear previous model
         if (modelRef.current) {
             scene.remove(modelRef.current);
         }
@@ -97,9 +112,8 @@ function BohrModelCanvas({ element }: { element: any | null }) {
         const nucleus = new THREE.Mesh(nucleusGeometry, nucleusMaterial);
         modelGroup.add(nucleus);
 
-        
         let currentRadius = BOHR_MODEL_CONFIG.baseOrbitRadius;
-        element.electrons.forEach((numElectrons: number, shellIndex: number) => {
+        electronShells.forEach((numElectrons: number, shellIndex: number) => {
             const orbitGeometry = new THREE.TorusGeometry(currentRadius, BOHR_MODEL_CONFIG.orbitWidth, 16, 100);
             const orbitMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.orbitColor });
             const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
@@ -108,7 +122,7 @@ function BohrModelCanvas({ element }: { element: any | null }) {
 
             for (let i = 0; i < numElectrons; i++) {
                 const electronGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.electronSize, 16, 16);
-                const electronMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.electronColor });
+                const electronMaterial = new THREE.MeshLambertMaterial({ color: BOHR_MODEL_CONFIG.electronColor });
                 const electron = new THREE.Mesh(electronGeometry, electronMaterial);
 
                 const angle = (i / numElectrons) * Math.PI * 2;
@@ -197,7 +211,7 @@ function StatsCard({ element }: { element: any | null }) {
                     </div>
                     <div>
                         <p className="font-semibold">Electrones</p>
-                        <p>{element.electrons && Array.isArray(element.electrons) ? element.electrons.reduce((a: number, b: number) => a + b, 0) : 'N/A'}</p>
+                        <p>{typeof element.electrones === 'number' ? element.electrones : 'N/A'}</p>
                     </div>
                 </div>
             </CardContent>
@@ -421,7 +435,6 @@ export default function AtomicCanvasClient() {
 
         pinchState.isPinching = isPinchingNow;
 
-        // Handle Dragging
         if (draggedCardRef.current && isPinchingNow) {
             const dragDeltaX = screenX - pinchState.lastScreenPos.x;
             const dragDeltaY = screenY - pinchState.lastScreenPos.y;
@@ -446,7 +459,6 @@ export default function AtomicCanvasClient() {
             return;
         }
         
-        // Handle Pinch End
         if (isEndingPinch && draggedCardRef.current) {
             const combinationArea = combinationAreaRef.current;
             if (combinationArea) {
@@ -461,15 +473,13 @@ export default function AtomicCanvasClient() {
             }
 
             draggedCardRef.current.userData.isDragging = false;
-            // Snap back
             const originalPos = draggedCardRef.current.userData.originalPosition;
             draggedCardRef.current.position.set(originalPos.x, originalPos.y, originalPos.z);
             draggedCardRef.current = null;
-            setSelectedElement(null); // Clear selection on drop
+            setSelectedElement(null);
             return;
         }
 
-        // Handle Hover and Pinch Start
         let hoveredCard: THREE.Group | null = null;
         
         const raycaster = new THREE.Raycaster();
@@ -565,7 +575,6 @@ export default function AtomicCanvasClient() {
         
         createCards(scene);
 
-        // Create Combination Area
         const comboAreaGeometry = new THREE.BoxGeometry(4, 2, 0.2);
         const comboAreaMaterial = new THREE.MeshBasicMaterial({ color: 0x007bff, transparent: true, opacity: 0.3 });
         const comboAreaMesh = new THREE.Mesh(comboAreaGeometry, comboAreaMaterial);
@@ -588,7 +597,6 @@ export default function AtomicCanvasClient() {
                 else rightHand = results.multiHandLandmarks[i];
               });
             } else if (results.multiHandLandmarks.length > 0) {
-              // Fallback if handedness is not available
               rightHand = results.multiHandLandmarks[0];
               if(results.multiHandLandmarks.length > 1) {
                   leftHand = results.multiHandLandmarks[1];
@@ -714,7 +722,3 @@ export default function AtomicCanvasClient() {
     </div>
   );
 }
-
-    
-
-    
