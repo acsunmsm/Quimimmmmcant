@@ -68,7 +68,7 @@ function StatsCard({ element }: { element: any | null }) {
     if (!element) return null;
 
     return (
-        <Card className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm border-gray-200/80 shadow-lg w-64">
+        <Card className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm border-gray-200/80 shadow-lg w-64 z-20">
             <CardHeader>
                 <CardTitle className="flex items-baseline gap-2">
                     <span className="text-4xl font-bold">{element.simbolo}</span>
@@ -108,7 +108,7 @@ function StatsCard({ element }: { element: any | null }) {
 function CombinationGuide({ hints, mixedElements }: { hints: CombinationHint[], mixedElements: any[] }) {
     if (mixedElements.length === 0) return null;
     return (
-        <Card className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-sm border-gray-200/80 shadow-lg w-full max-w-md">
+        <Card className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/80 backdrop-blur-sm border-gray-200/80 shadow-lg w-full max-w-md z-20">
             <CardHeader>
                 <CardTitle className="text-xl">Guía de Combinación</CardTitle>
             </CardHeader>
@@ -228,8 +228,10 @@ export default function AtomicCanvasClient() {
       cancelAnimationFrame(animationFrameId);
       mpCamera?.stop();
       hands?.close();
-      const stream = videoRef.current?.srcObject as MediaStream;
-      stream?.getTracks().forEach((track) => track.stop());
+      if(videoRef.current?.srcObject){
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream?.getTracks().forEach((track) => track.stop());
+      }
       rendererRef.current?.dispose();
     };
 
@@ -239,7 +241,7 @@ export default function AtomicCanvasClient() {
     };
     
     const createBohrModel = (elementData: any) => {
-        if (!sceneRef.current || !elementData) return;
+        if (!sceneRef.current || !elementData || !cameraRef.current) return;
         clearBohrModel();
     
         const modelGroup = new THREE.Group();
@@ -271,7 +273,7 @@ export default function AtomicCanvasClient() {
         modelGroup.add(textMesh);
     
         let currentRadius = BOHR_MODEL_CONFIG.baseOrbitRadius;
-        if(elementData.electrons) {
+        if(elementData.electrons && Array.isArray(elementData.electrons)) {
             elementData.electrons.forEach((numElectrons: number, shellIndex: number) => {
                 const orbitGeometry = new THREE.TorusGeometry(currentRadius, BOHR_MODEL_CONFIG.orbitWidth, 16, 100);
                 const orbitMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.orbitColor });
@@ -315,8 +317,8 @@ export default function AtomicCanvasClient() {
                     if (child.material) {
                         const materials = Array.isArray(child.material) ? child.material : [child.material];
                         materials.forEach((mat: THREE.Material) => {
-                            if ((mat as THREE.MeshBasicMaterial).map) {
-                                (mat as THREE.MeshBasicMaterial).map!.dispose();
+                            if ((mat as any).map) {
+                                (mat as any).map!.dispose();
                             }
                             mat.dispose();
                         });
@@ -409,7 +411,7 @@ export default function AtomicCanvasClient() {
       });
     }
     
-    const detectCardInteraction = (handLandmarks: any, camera: THREE.Camera) => {
+    const detectCardInteraction = (handLandmarks: any, camera: THREE.Camera, currentMixedElements: any[]) => {
         const indexTip = handLandmarks[8];
         const thumbTip = handLandmarks[4];
         const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
@@ -453,7 +455,7 @@ export default function AtomicCanvasClient() {
                 const cardBox = new THREE.Box3().setFromObject(draggedCardRef.current);
                 const areaBox = new THREE.Box3().setFromObject(combinationArea);
                 if (cardBox.intersectsBox(areaBox)) {
-                    const newMixedElements = [...mixedElements, draggedCardRef.current.userData];
+                    const newMixedElements = [...currentMixedElements, draggedCardRef.current.userData];
                     setMixedElements(newMixedElements);
                     updateCombinationHints(newMixedElements);
                     checkCombinations(newMixedElements);
@@ -466,6 +468,7 @@ export default function AtomicCanvasClient() {
             draggedCardRef.current.position.set(originalPos.x, originalPos.y, originalPos.z);
             draggedCardRef.current = null;
             clearBohrModel();
+            return;
         }
 
         let hoveredCard: THREE.Group | null = null;
@@ -536,9 +539,16 @@ export default function AtomicCanvasClient() {
 
         const scene = new THREE.Scene();
         sceneRef.current = scene;
-        const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-        camera.position.z = 5;
+        const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 100);
         cameraRef.current = camera;
+        
+        const worldWidth = 14; 
+        const worldHeight = 8; 
+        const distance = Math.max(
+          worldWidth / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2) * camera.aspect)),
+          worldHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)))
+        ) + 2;
+        camera.position.z = distance;
 
         const renderer = new THREE.WebGLRenderer({ canvas: threeCanvasEl, alpha: true });
         renderer.setPixelRatio(window.devicePixelRatio);
@@ -564,6 +574,15 @@ export default function AtomicCanvasClient() {
         hands = new window.Hands({ locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
         hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
 
+        let currentMixedElements = mixedElements;
+        const mixedElementsSub = (newElements: any[]) => {
+            currentMixedElements = newElements;
+        }
+        setMixedElements(prev => {
+            mixedElementsSub(prev);
+            return prev;
+        });
+
         hands.onResults((results: any) => {
           handsCtx.save();
           handsCtx.clearRect(0, 0, handsCanvasEl.width, handsCanvasEl.height);
@@ -578,7 +597,7 @@ export default function AtomicCanvasClient() {
             }
 
             if(rightHand) {
-                 detectCardInteraction(rightHand, cameraRef.current);
+                 detectCardInteraction(rightHand, cameraRef.current, currentMixedElements);
                  window.drawConnectors(handsCtx, rightHand, window.HAND_CONNECTIONS, { color: '#FF7B00', lineWidth: 5 });
                  window.drawLandmarks(handsCtx, rightHand, { color: '#07C1FF', lineWidth: 2, radius: 5 });
             } else {
@@ -637,7 +656,7 @@ export default function AtomicCanvasClient() {
         });
 
         mpCamera = new window.Camera(videoEl, {
-          onFrame: async () => { await hands.send({ image: videoEl }); },
+          onFrame: async () => await hands.send({ image: videoEl }),
           width: width,
           height: height,
         });
@@ -670,19 +689,24 @@ export default function AtomicCanvasClient() {
     init();
 
     return cleanup;
-  }, [mixedElements, toast]);
+  }, []); // Removed mixedElements from dependencies
+
+  const handleClearMixedElements = () => {
+    setMixedElements([]);
+    setCombinationHints([]);
+  }
 
   return (
     <div className="w-screen h-screen bg-black flex items-center justify-center">
       {status === "error" && (
-        <Alert variant="destructive" className="max-w-md">
+        <Alert variant="destructive" className="max-w-md z-20">
           <Terminal className="h-4 w-4" />
           <AlertTitle>Initialization Failed</AlertTitle>
           <AlertDescription>{errorMessage}</AlertDescription>
         </Alert>
       )}
 
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 z-0">
         <video
           ref={videoRef}
           playsInline
@@ -697,10 +721,10 @@ export default function AtomicCanvasClient() {
         />
         <canvas
           ref={handsCanvasRef}
-          className="absolute top-0 left-0 w-full h-full transform -scale-x-100 pointer-events-none"
+          className="absolute top-0 left-0 w-full h-full transform -scale-x-100 pointer-events-none z-10"
         />
         <StatsCard element={selectedElement} />
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-6 py-2 rounded-lg flex items-center gap-2">
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-6 py-2 rounded-lg flex items-center gap-2 z-20">
             <FlaskConical />
             <p className="font-bold text-lg">Espacio de Combinación</p>
             <div className="flex gap-2 ml-4">
@@ -709,7 +733,7 @@ export default function AtomicCanvasClient() {
                 ))}
             </div>
             {mixedElements.length > 0 && (
-                <Button variant="destructive" size="sm" onClick={() => { setMixedElements([]); setCombinationHints([]); }}>Limpiar</Button>
+                <Button variant="destructive" size="sm" onClick={handleClearMixedElements}>Limpiar</Button>
             )}
         </div>
         <CombinationGuide hints={combinationHints} mixedElements={mixedElements} />
@@ -717,7 +741,5 @@ export default function AtomicCanvasClient() {
     </div>
   );
 }
-
-    
 
     
