@@ -246,9 +246,6 @@ export default function AtomicCanvasClient() {
   const [combinationHints, setCombinationHints] = useState<CombinationHint[]>([]);
   const { toast } = useToast();
 
-
-  const previousLeftFist = useRef<{ x: number, y: number } | null>(null);
-
   const cardMeshesRef = useRef<THREE.Group[]>([]);
   const draggedCardRef = useRef<THREE.Group | null>(null);
   const pinchState = useRef({
@@ -339,11 +336,6 @@ export default function AtomicCanvasClient() {
         stream?.getTracks().forEach((track) => track.stop());
       }
       rendererRef.current?.dispose();
-    };
-
-    const isFist = (landmarks: any[]) => {
-      const fingerTipIndices = [4, 8, 12, 16, 20];
-      return fingerTipIndices.every(i => landmarks[i].y > landmarks[i - 2].y);
     };
 
     const createCard = (symbol: string, elementData: any, position: { x: number, y: number, z: number }) => {
@@ -622,32 +614,7 @@ export default function AtomicCanvasClient() {
             if (leftHand) {
                 window.drawConnectors(handsCtx, leftHand, window.HAND_CONNECTIONS, { color: '#007BFF', lineWidth: 5 });
                 window.drawLandmarks(handsCtx, leftHand, { color: '#FFC107', lineWidth: 2, radius: 5 });
-              if (isFist(leftHand)) {
-                const x = (1 - leftHand[9].x) * window.innerWidth;
-                const y = leftHand[9].y * window.innerHeight;
-
-                if (previousLeftFist.current && cameraRef.current) {
-                  const deltaX = x - previousLeftFist.current.x;
-                  const deltaY = y - previousLeftFist.current.y;
-                  
-                  const camera = cameraRef.current;
-                  const radius = camera.position.length();
-                  const theta = Math.atan2(camera.position.x, camera.position.z) + deltaX * -0.005;
-                  const phi = Math.atan2(camera.position.y, Math.sqrt(camera.position.x ** 2 + camera.position.z ** 2)) - deltaY * -0.005;
-                  const clampedPhi = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, phi));
-
-                  camera.position.x = radius * Math.sin(theta) * Math.cos(clampedPhi);
-                  camera.position.z = radius * Math.cos(theta) * Math.cos(clampedPhi);
-                  camera.position.y = radius * Math.sin(clampedPhi);
-                  camera.lookAt(new THREE.Vector3(0, 0, 0));
-                }
-                previousLeftFist.current = { x, y };
-              } else {
-                previousLeftFist.current = null;
-              }
-            } else {
-                 previousLeftFist.current = null;
-            }
+            } 
           } else {
              if (draggedCardRef.current) {
                 draggedCardRef.current.userData.isDragging = false;
@@ -656,7 +623,6 @@ export default function AtomicCanvasClient() {
                 draggedCardRef.current = null;
                 setSelectedElement(null);
             }
-            previousLeftFist.current = null;
             pinchState.isPinching = false;
           }
 
