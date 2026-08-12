@@ -88,11 +88,17 @@ function BohrModelCanvas({ element }: { element: any | null }) {
         const electronShells = calculateElectronShells(element.electrones);
 
         const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(50, canvasRef.current.width / canvasRef.current.height, 0.1, 100);
-        camera.position.z = 10;
+        const width = canvasRef.current.clientWidth;
+        const height = canvasRef.current.clientHeight;
+        const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
+        
+        const maxRadius = electronShells.length > 0 
+            ? BOHR_MODEL_CONFIG.baseOrbitRadius + (electronShells.length - 1) * BOHR_MODEL_CONFIG.orbitSpacing
+            : BOHR_MODEL_CONFIG.baseOrbitRadius;
+        camera.position.z = maxRadius * 2.2 + 1;
         
         const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, alpha: true });
-        renderer.setSize(canvasRef.current.width, canvasRef.current.height);
+        renderer.setSize(width, height, false);
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 1);
         scene.add(ambientLight);
@@ -180,7 +186,7 @@ function BohrModelCanvas({ element }: { element: any | null }) {
 
     if (!element) return null;
 
-    return <canvas ref={canvasRef} className="w-full h-48" width="256" height="192" />;
+    return <canvas ref={canvasRef} className="w-full h-48" />;
 }
 
 function StatsCard({ element }: { element: any | null }) {
@@ -266,6 +272,9 @@ export default function AtomicCanvasClient() {
     isPinching: false,
     lastScreenPos: { x: 0, y: 0 },
   }).current;
+  
+  const mixedElementsRef = useRef<any[]>(mixedElements);
+  mixedElementsRef.current = mixedElements;
 
     const checkCombinations = (currentElements: any[]) => {
         const counts: { [key: string]: number } = currentElements.reduce((acc, el) => {
@@ -337,17 +346,32 @@ export default function AtomicCanvasClient() {
     let animationFrameId: number;
     let hands: any;
     let mpCamera: any;
-    
-    const mixedElementsRef = React.createRef<any[]>();
-    mixedElementsRef.current = mixedElements;
 
     const cleanup = () => {
       cancelAnimationFrame(animationFrameId);
       mpCamera?.stop();
       hands?.close();
-      if(videoRef.current?.srcObject){
+      if (videoRef.current?.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream?.getTracks().forEach((track) => track.stop());
+      }
+      
+      if (sceneRef.current) {
+        sceneRef.current.traverse((object: any) => {
+          if (!object.isMesh) return;
+          object.geometry?.dispose();
+          if (object.material) {
+            if (Array.isArray(object.material)) {
+              object.material.forEach((mat: any) => {
+                 if (mat.map) mat.map.dispose();
+                 mat.dispose();
+              });
+            } else {
+              if (object.material.map) object.material.map.dispose();
+              object.material.dispose();
+            }
+          }
+        });
       }
       rendererRef.current?.dispose();
     };
@@ -422,7 +446,7 @@ export default function AtomicCanvasClient() {
         const indexTip = handLandmarks[8];
         const thumbTip = handLandmarks[4];
         const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
-        const isPinchingNow = distance < 0.05;
+        const isPinchingNow = distance < 0.08;
 
         const pinchXNormalized = (indexTip.x + thumbTip.x) / 2;
         const pinchYNormalized = (indexTip.y + thumbTip.y) / 2;
@@ -537,7 +561,7 @@ export default function AtomicCanvasClient() {
         const threeCanvasEl = threeCanvasRef.current;
         const handsCanvasEl = handsCanvasRef.current;
 
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60 } } });
         videoEl.srcObject = stream;
         await new Promise((resolve) => { videoEl.onloadedmetadata = resolve; });
 
@@ -564,7 +588,7 @@ export default function AtomicCanvasClient() {
 
         const renderer = new THREE.WebGLRenderer({ canvas: threeCanvasEl, alpha: true });
         renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.setSize(width, height);
+        renderer.setSize(width, height, false);
         rendererRef.current = renderer;
 
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
@@ -583,43 +607,30 @@ export default function AtomicCanvasClient() {
         combinationAreaRef.current = comboAreaMesh;
 
         hands = new window.Hands({ locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
-        hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
+        hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
         
         hands.onResults((results: any) => {
           handsCtx.save();
           handsCtx.clearRect(0, 0, handsCanvasEl.width, handsCanvasEl.height);
 
-          if (results.multiHandLandmarks && cameraRef.current) {
-             let leftHand = null, rightHand = null;
-            if(results.multiHandedness.length > 0){
-              results.multiHandedness.forEach((handedness: any, i: number) => {
-                if (handedness.label === 'Right') leftHand = results.multiHandLandmarks[i];
-                else rightHand = results.multiHandLandmarks[i];
-              });
-            } else if (results.multiHandLandmarks.length > 0) {
-              rightHand = results.multiHandLandmarks[0];
-            }
+          if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0 && cameraRef.current) {
+             let interactingHand = null;
+             
+             results.multiHandLandmarks.forEach((landmarks: any, i: number) => {
+                 const isRight = results.multiHandedness?.[i]?.label !== 'Right'; // MediaPipe mirrors 'Right' as left hand
+                 const color = isRight ? '#FF7B00' : '#007BFF';
+                 const landmarkColor = isRight ? '#07C1FF' : '#FFC107';
+                 
+                 if (i === 0) interactingHand = landmarks;
+                 
+                 window.drawConnectors(handsCtx, landmarks, window.HAND_CONNECTIONS, { color: color, lineWidth: 5 });
+                 window.drawLandmarks(handsCtx, landmarks, { color: landmarkColor, lineWidth: 2, radius: 5 });
+             });
 
+             if (interactingHand) {
+                 detectCardInteraction(interactingHand, cameraRef.current);
+             }
 
-            if(rightHand) {
-                 detectCardInteraction(rightHand, cameraRef.current);
-                 window.drawConnectors(handsCtx, rightHand, window.HAND_CONNECTIONS, { color: '#FF7B00', lineWidth: 5 });
-                 window.drawLandmarks(handsCtx, rightHand, { color: '#07C1FF', lineWidth: 2, radius: 5 });
-            } else {
-                 if (draggedCardRef.current) {
-                    draggedCardRef.current.userData.isDragging = false;
-                    const originalPos = draggedCardRef.current.userData.originalPosition;
-                    draggedCardRef.current.position.set(originalPos.x, originalPos.y, originalPos.z);
-                    draggedCardRef.current = null;
-                    setSelectedElement(null);
-                 }
-                 pinchState.isPinching = false;
-            }
-
-            if (leftHand) {
-                window.drawConnectors(handsCtx, leftHand, window.HAND_CONNECTIONS, { color: '#007BFF', lineWidth: 5 });
-                window.drawLandmarks(handsCtx, leftHand, { color: '#FFC107', lineWidth: 2, radius: 5 });
-            } 
           } else {
              if (draggedCardRef.current) {
                 draggedCardRef.current.userData.isDragging = false;
@@ -667,7 +678,7 @@ export default function AtomicCanvasClient() {
     init();
 
     return cleanup;
-  }, [mixedElements]); 
+  }, []); 
 
   const handleClearMixedElements = () => {
     setMixedElements([]);
@@ -695,11 +706,11 @@ export default function AtomicCanvasClient() {
         />
         <canvas
           ref={threeCanvasRef}
-          className="absolute top-0 left-0 w-full h-full"
+          className="absolute top-0 left-0 w-full h-full object-cover"
         />
         <canvas
           ref={handsCanvasRef}
-          className="absolute top-0 left-0 w-full h-full transform -scale-x-100 pointer-events-none z-10"
+          className="absolute top-0 left-0 w-full h-full object-cover transform -scale-x-100 pointer-events-none z-10"
         />
         <StatsCard element={selectedElement} />
         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-6 py-2 rounded-lg flex items-center gap-2 z-20">
