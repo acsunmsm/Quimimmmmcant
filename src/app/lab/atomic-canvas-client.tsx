@@ -13,7 +13,7 @@ import combinationRules from "@/lib/reglas.json";
 
 const ELEMENTOS_DATA: { [key: string]: any } = {};
 data.elementos.forEach(el => {
-    ELEMENTOS_DATA[el.simbolo] = el;
+  ELEMENTOS_DATA[el.simbolo] = el;
 });
 
 
@@ -48,205 +48,205 @@ declare global {
 
 type Status = "loading" | "ready" | "error";
 type CombinationHint = {
-    producto: string;
-    faltantes: { simbolo: string; cantidad: number }[];
+  producto: string;
+  faltantes: { simbolo: string; cantidad: number }[];
 };
 
 
 const BOHR_MODEL_CONFIG = {
-    nucleusSize: 0.5,
-    nucleusColor: 0xff5555,
-    electronSize: 0.15,
-    electronColor: 0x00aaff,
-    orbitWidth: 0.02,
-    orbitColor: 0x888888,
-    baseOrbitRadius: 1.2,
-    orbitSpacing: 0.8
+  nucleusSize: 0.5,
+  nucleusColor: 0xff5555,
+  electronSize: 0.15,
+  electronColor: 0x00aaff,
+  orbitWidth: 0.02,
+  orbitColor: 0x888888,
+  baseOrbitRadius: 1.2,
+  orbitSpacing: 0.8
 };
 
 function calculateElectronShells(numElectrons: number): number[] {
-    const shells: number[] = [];
-    let remainingElectrons = numElectrons;
-    let n = 1;
-    while (remainingElectrons > 0) {
-        const capacity = 2 * n * n;
-        const electronsInShell = Math.min(remainingElectrons, capacity);
-        shells.push(electronsInShell);
-        remainingElectrons -= electronsInShell;
-        n++;
-    }
-    return shells;
+  const shells: number[] = [];
+  let remainingElectrons = numElectrons;
+  let n = 1;
+  while (remainingElectrons > 0) {
+    const capacity = 2 * n * n;
+    const electronsInShell = Math.min(remainingElectrons, capacity);
+    shells.push(electronsInShell);
+    remainingElectrons -= electronsInShell;
+    n++;
+  }
+  return shells;
 }
 
 function BohrModelCanvas({ element }: { element: any | null }) {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const modelRef = useRef<THREE.Group | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const modelRef = useRef<THREE.Group | null>(null);
 
-    useEffect(() => {
-        if (!canvasRef.current || !element || typeof element.electrones !== 'number') return;
+  useEffect(() => {
+    if (!canvasRef.current || !element || typeof element.electrones !== 'number') return;
 
-        const electronShells = calculateElectronShells(element.electrones);
+    const electronShells = calculateElectronShells(element.electrones);
 
-        const scene = new THREE.Scene();
-        const width = canvasRef.current.clientWidth;
-        const height = canvasRef.current.clientHeight;
-        const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
-        
-        const maxRadius = electronShells.length > 0 
-            ? BOHR_MODEL_CONFIG.baseOrbitRadius + (electronShells.length - 1) * BOHR_MODEL_CONFIG.orbitSpacing
-            : BOHR_MODEL_CONFIG.baseOrbitRadius;
-        camera.position.z = maxRadius * 2.2 + 1;
-        
-        const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, alpha: true });
-        renderer.setSize(width, height, false);
+    const scene = new THREE.Scene();
+    const width = canvasRef.current.clientWidth;
+    const height = canvasRef.current.clientHeight;
+    const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 100);
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1);
-        scene.add(ambientLight);
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-        directionalLight.position.set(5, 10, 7.5);
-        scene.add(directionalLight);
+    const maxRadius = electronShells.length > 0
+      ? BOHR_MODEL_CONFIG.baseOrbitRadius + (electronShells.length - 1) * BOHR_MODEL_CONFIG.orbitSpacing
+      : BOHR_MODEL_CONFIG.baseOrbitRadius;
+    camera.position.z = maxRadius * 2.2 + 1;
 
-        if (modelRef.current) {
-            scene.remove(modelRef.current);
+    const renderer = new THREE.WebGLRenderer({ canvas: canvasRef.current, alpha: true });
+    renderer.setSize(width, height, false);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(5, 10, 7.5);
+    scene.add(directionalLight);
+
+    if (modelRef.current) {
+      scene.remove(modelRef.current);
+    }
+
+    const modelGroup = new THREE.Group();
+    modelRef.current = modelGroup;
+
+    const nucleusGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.nucleusSize, 32, 32);
+    const nucleusMaterial = new THREE.MeshLambertMaterial({ color: BOHR_MODEL_CONFIG.nucleusColor });
+    const nucleus = new THREE.Mesh(nucleusGeometry, nucleusMaterial);
+    modelGroup.add(nucleus);
+
+    let currentRadius = BOHR_MODEL_CONFIG.baseOrbitRadius;
+    electronShells.forEach((numElectrons: number, shellIndex: number) => {
+      const orbitGeometry = new THREE.TorusGeometry(currentRadius, BOHR_MODEL_CONFIG.orbitWidth, 16, 100);
+      const orbitMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.orbitColor });
+      const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
+      orbit.rotation.x = Math.PI / 2;
+      modelGroup.add(orbit);
+
+      for (let i = 0; i < numElectrons; i++) {
+        const electronGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.electronSize, 16, 16);
+        const electronMaterial = new THREE.MeshLambertMaterial({ color: BOHR_MODEL_CONFIG.electronColor });
+        const electron = new THREE.Mesh(electronGeometry, electronMaterial);
+
+        const angle = (i / numElectrons) * Math.PI * 2;
+        electron.position.set(Math.cos(angle) * currentRadius, 0, Math.sin(angle) * currentRadius);
+        electron.userData = {
+          orbitRadius: currentRadius,
+          initialAngle: angle,
+          orbitSpeed: 0.5 + (shellIndex * 0.2),
+        };
+        modelGroup.add(electron);
+      }
+      currentRadius += BOHR_MODEL_CONFIG.orbitSpacing;
+    });
+
+    modelGroup.rotation.x = -Math.PI / 8;
+    modelGroup.rotation.y = -Math.PI / 8;
+    scene.add(modelGroup);
+
+    let animationFrameId: number;
+    const animate = () => {
+      animationFrameId = requestAnimationFrame(animate);
+      const time = Date.now() * 0.0005;
+      modelGroup.children.forEach((child: any) => {
+        if (child.userData.orbitRadius) {
+          const speed = child.userData.orbitSpeed;
+          const angle = child.userData.initialAngle + time * speed;
+          const radius = child.userData.orbitRadius;
+          child.position.x = Math.cos(angle) * radius;
+          child.position.z = Math.sin(angle) * radius;
         }
+      });
+      renderer.render(scene, camera);
+    };
 
-        const modelGroup = new THREE.Group();
-        modelRef.current = modelGroup;
+    animate();
 
-        const nucleusGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.nucleusSize, 32, 32);
-        const nucleusMaterial = new THREE.MeshLambertMaterial({ color: BOHR_MODEL_CONFIG.nucleusColor });
-        const nucleus = new THREE.Mesh(nucleusGeometry, nucleusMaterial);
-        modelGroup.add(nucleus);
-
-        let currentRadius = BOHR_MODEL_CONFIG.baseOrbitRadius;
-        electronShells.forEach((numElectrons: number, shellIndex: number) => {
-            const orbitGeometry = new THREE.TorusGeometry(currentRadius, BOHR_MODEL_CONFIG.orbitWidth, 16, 100);
-            const orbitMaterial = new THREE.MeshBasicMaterial({ color: BOHR_MODEL_CONFIG.orbitColor });
-            const orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
-            orbit.rotation.x = Math.PI / 2;
-            modelGroup.add(orbit);
-
-            for (let i = 0; i < numElectrons; i++) {
-                const electronGeometry = new THREE.SphereGeometry(BOHR_MODEL_CONFIG.electronSize, 16, 16);
-                const electronMaterial = new THREE.MeshLambertMaterial({ color: BOHR_MODEL_CONFIG.electronColor });
-                const electron = new THREE.Mesh(electronGeometry, electronMaterial);
-
-                const angle = (i / numElectrons) * Math.PI * 2;
-                electron.position.set(Math.cos(angle) * currentRadius, 0, Math.sin(angle) * currentRadius);
-                electron.userData = {
-                    orbitRadius: currentRadius,
-                    initialAngle: angle,
-                    orbitSpeed: 0.5 + (shellIndex * 0.2),
-                };
-                modelGroup.add(electron);
-            }
-            currentRadius += BOHR_MODEL_CONFIG.orbitSpacing;
-        });
-        
-        modelGroup.rotation.x = -Math.PI / 8;
-        modelGroup.rotation.y = -Math.PI / 8;
-        scene.add(modelGroup);
-
-        let animationFrameId: number;
-        const animate = () => {
-            animationFrameId = requestAnimationFrame(animate);
-            const time = Date.now() * 0.0005;
-            modelGroup.children.forEach((child: any) => {
-                if (child.userData.orbitRadius) {
-                    const speed = child.userData.orbitSpeed;
-                    const angle = child.userData.initialAngle + time * speed;
-                    const radius = child.userData.orbitRadius;
-                    child.position.x = Math.cos(angle) * radius;
-                    child.position.z = Math.sin(angle) * radius;
-                }
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      renderer.dispose();
+      modelGroup.traverse((child: any) => {
+        if (child.isMesh) {
+          child.geometry?.dispose();
+          if (child.material) {
+            const materials = Array.isArray(child.material) ? child.material : [child.material];
+            materials.forEach((mat: any) => {
+              if (mat.map) mat.map.dispose();
+              mat.dispose();
             });
-            renderer.render(scene, camera);
-        };
+          }
+        }
+      });
+      if (modelRef.current) scene.remove(modelRef.current);
+    };
+  }, [element]);
 
-        animate();
+  if (!element) return null;
 
-        return () => {
-            cancelAnimationFrame(animationFrameId);
-            renderer.dispose();
-             modelGroup.traverse((child: any) => {
-                if (child.isMesh) {
-                    child.geometry?.dispose();
-                    if (child.material) {
-                         const materials = Array.isArray(child.material) ? child.material : [child.material];
-                         materials.forEach((mat: any) => {
-                             if (mat.map) mat.map.dispose();
-                             mat.dispose();
-                         });
-                    }
-                }
-            });
-            if(modelRef.current) scene.remove(modelRef.current);
-        };
-    }, [element]);
-
-    if (!element) return null;
-
-    return <canvas ref={canvasRef} className="w-full h-48" />;
+  return <canvas ref={canvasRef} className="w-full h-48" />;
 }
 
 function StatsCard({ element }: { element: any | null }) {
-    if (!element) return null;
+  if (!element) return null;
 
-    return (
-        <Card className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm border-gray-200/80 shadow-lg w-64 z-20">
-            <CardHeader className="pb-2">
-                <CardTitle className="flex items-baseline gap-2">
-                    <span className="text-4xl font-bold">{element.simbolo}</span>
-                    <span className="text-2xl font-semibold">{element.nombre}</span>
-                </CardTitle>
-            </CardHeader>
-            <CardContent>
-                <BohrModelCanvas element={element} />
-                <div className="grid grid-cols-2 gap-2 text-sm mt-4">
-                    <div>
-                        <p className="font-semibold">N. Atómico</p>
-                        <p>{element.numeroAtomico}</p>
-                    </div>
-                    <div>
-                        <p className="font-semibold">Protones</p>
-                        <p>{element.protones}</p>
-                    </div>
-                    <div>
-                        <p className="font-semibold">Neutrones</p>
-                        <p>{element.neutrones}</p>
-                    </div>
-                    <div>
-                        <p className="font-semibold">Electrones</p>
-                        <p>{typeof element.electrones === 'number' ? element.electrones : 'N/A'}</p>
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    );
+  return (
+    <Card className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm border-gray-200/80 shadow-lg w-64 z-20">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-baseline gap-2">
+          <span className="text-4xl font-bold">{element.simbolo}</span>
+          <span className="text-2xl font-semibold">{element.nombre}</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <BohrModelCanvas element={element} />
+        <div className="grid grid-cols-2 gap-2 text-sm mt-4">
+          <div>
+            <p className="font-semibold">N. Atómico</p>
+            <p>{element.numeroAtomico}</p>
+          </div>
+          <div>
+            <p className="font-semibold">Protones</p>
+            <p>{element.protones}</p>
+          </div>
+          <div>
+            <p className="font-semibold">Neutrones</p>
+            <p>{element.neutrones}</p>
+          </div>
+          <div>
+            <p className="font-semibold">Electrones</p>
+            <p>{typeof element.electrones === 'number' ? element.electrones : 'N/A'}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function CombinationGuide({ hints, mixedElements }: { hints: CombinationHint[], mixedElements: any[] }) {
-    if (mixedElements.length === 0) return null;
-    return (
-        <Card className="absolute top-4 left-4 bg-white/80 backdrop-blur-sm border-gray-200/80 shadow-lg w-full max-w-sm z-20">
-            <CardHeader>
-                <CardTitle className="text-xl">Guía de Combinación</CardTitle>
-            </CardHeader>
-            <CardContent>
-                {hints.length > 0 ? (
-                    <ul className="space-y-2">
-                        {hints.map(hint => (
-                            <li key={hint.producto} className="text-sm">
-                                Para formar <span className="font-bold">{hint.producto.replace(/_/g, ' ')}</span>, necesitas: {hint.faltantes.map(f => `${f.cantidad}x ${f.simbolo}`).join(', ')}
-                            </li>
-                        ))}
-                    </ul>
-                ) : (
-                    <p className="text-sm text-muted-foreground">No hay combinaciones conocidas para los elementos actuales.</p>
-                )}
-            </CardContent>
-        </Card>
-    )
+  if (mixedElements.length === 0) return null;
+  return (
+    <Card className="absolute top-4 left-4 bg-white/80 backdrop-blur-sm border-gray-200/80 shadow-lg w-full max-w-sm z-20">
+      <CardHeader>
+        <CardTitle className="text-xl">Guía de Combinación</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {hints.length > 0 ? (
+          <ul className="space-y-2">
+            {hints.map(hint => (
+              <li key={hint.producto} className="text-sm">
+                Para formar <span className="font-bold">{hint.producto.replace(/_/g, ' ')}</span>, necesitas: {hint.faltantes.map(f => `${f.cantidad}x ${f.simbolo}`).join(', ')}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">No hay combinaciones conocidas para los elementos actuales.</p>
+        )}
+      </CardContent>
+    </Card>
+  )
 }
 
 export default function AtomicCanvasClient() {
@@ -271,73 +271,76 @@ export default function AtomicCanvasClient() {
   const pinchState = useRef({
     isPinching: false,
     lastScreenPos: { x: 0, y: 0 },
+    releaseFramesCount: 0,
   }).current;
-  
+
+  const smoothedPinchRef = useRef({ x: 0, y: 0 }); // Added LERP ref for smoothing
+
   const mixedElementsRef = useRef<any[]>(mixedElements);
   mixedElementsRef.current = mixedElements;
 
-    const checkCombinations = (currentElements: any[]) => {
-        const counts: { [key: string]: number } = currentElements.reduce((acc, el) => {
-            acc[el.simbolo] = (acc[el.simbolo] || 0) + 1;
-            return acc;
-        }, {});
+  const checkCombinations = (currentElements: any[]) => {
+    const counts: { [key: string]: number } = currentElements.reduce((acc, el) => {
+      acc[el.simbolo] = (acc[el.simbolo] || 0) + 1;
+      return acc;
+    }, {});
 
-        for (const rule of combinationRules.reglas) {
-            const requiredCounts: { [key: string]: number } = rule.reactivos.reduce((acc, r) => {
-                acc[r.simbolo] = r.cantidad;
-                return acc;
-            }, {} as { [key: string]: number });
+    for (const rule of combinationRules.reglas) {
+      const requiredCounts: { [key: string]: number } = rule.reactivos.reduce((acc, r) => {
+        acc[r.simbolo] = r.cantidad;
+        return acc;
+      }, {} as { [key: string]: number });
 
-            const isMatch = Object.keys(requiredCounts).length === Object.keys(counts).length &&
-                Object.keys(requiredCounts).every(simbolo => counts[simbolo] === requiredCounts[simbolo]);
+      const isMatch = Object.keys(requiredCounts).length === Object.keys(counts).length &&
+        Object.keys(requiredCounts).every(simbolo => counts[simbolo] === requiredCounts[simbolo]);
 
-            if (isMatch) {
-                toast({
-                    title: "¡Molécula Formada!",
-                    description: `Has creado ${rule.producto.replace(/_/g, ' ')}.`,
-                    action: <div className="p-2 rounded-full bg-green-500"><CheckCircle className="text-white" /></div>
-                });
-                setMixedElements([]);
-                setCombinationHints([]);
-                break;
-            }
-        }
-    }
-
-
-    const updateCombinationHints = (currentElements: any[]) => {
-        if (currentElements.length === 0) {
-            setCombinationHints([]);
-            return;
-        }
-
-        const counts: { [key: string]: number } = currentElements.reduce((acc, el) => {
-            acc[el.simbolo] = (acc[el.simbolo] || 0) + 1;
-            return acc;
-        }, {});
-
-        const hints: CombinationHint[] = [];
-        combinationRules.reglas.forEach(rule => {
-            const ruleCounts: { [key: string]: number } = rule.reactivos.reduce((acc, r) => {
-                acc[r.simbolo] = r.cantidad;
-                return acc;
-            }, {} as { [key: string]: number });
-
-            const isPartialMatch = Object.keys(counts).every(simbolo => ruleCounts[simbolo] >= counts[simbolo]);
-
-            if (isPartialMatch) {
-                const faltantes = rule.reactivos.map(r => ({
-                    simbolo: r.simbolo,
-                    cantidad: r.cantidad - (counts[r.simbolo] || 0)
-                })).filter(f => f.cantidad > 0);
-
-                if (faltantes.length > 0 && faltantes.length < rule.reactivos.length + Object.keys(counts).length) {
-                    hints.push({ producto: rule.producto, faltantes });
-                }
-            }
+      if (isMatch) {
+        toast({
+          title: "¡Molécula Formada!",
+          description: `Has creado ${rule.producto.replace(/_/g, ' ')}.`,
+          action: <div className="p-2 rounded-full bg-green-500"><CheckCircle className="text-white" /></div>
         });
-        setCombinationHints(hints);
+        setMixedElements([]);
+        setCombinationHints([]);
+        break;
+      }
     }
+  }
+
+
+  const updateCombinationHints = (currentElements: any[]) => {
+    if (currentElements.length === 0) {
+      setCombinationHints([]);
+      return;
+    }
+
+    const counts: { [key: string]: number } = currentElements.reduce((acc, el) => {
+      acc[el.simbolo] = (acc[el.simbolo] || 0) + 1;
+      return acc;
+    }, {});
+
+    const hints: CombinationHint[] = [];
+    combinationRules.reglas.forEach(rule => {
+      const ruleCounts: { [key: string]: number } = rule.reactivos.reduce((acc, r) => {
+        acc[r.simbolo] = r.cantidad;
+        return acc;
+      }, {} as { [key: string]: number });
+
+      const isPartialMatch = Object.keys(counts).every(simbolo => ruleCounts[simbolo] >= counts[simbolo]);
+
+      if (isPartialMatch) {
+        const faltantes = rule.reactivos.map(r => ({
+          simbolo: r.simbolo,
+          cantidad: r.cantidad - (counts[r.simbolo] || 0)
+        })).filter(f => f.cantidad > 0);
+
+        if (faltantes.length > 0 && faltantes.length < rule.reactivos.length + Object.keys(counts).length) {
+          hints.push({ producto: rule.producto, faltantes });
+        }
+      }
+    });
+    setCombinationHints(hints);
+  }
 
 
   useEffect(() => {
@@ -355,7 +358,7 @@ export default function AtomicCanvasClient() {
         const stream = videoRef.current.srcObject as MediaStream;
         stream?.getTracks().forEach((track) => track.stop());
       }
-      
+
       if (sceneRef.current) {
         sceneRef.current.traverse((object: any) => {
           if (!object.isMesh) return;
@@ -363,8 +366,8 @@ export default function AtomicCanvasClient() {
           if (object.material) {
             if (Array.isArray(object.material)) {
               object.material.forEach((mat: any) => {
-                 if (mat.map) mat.map.dispose();
-                 mat.dispose();
+                if (mat.map) mat.map.dispose();
+                mat.dispose();
               });
             } else {
               if (object.material.map) object.material.map.dispose();
@@ -440,110 +443,156 @@ export default function AtomicCanvasClient() {
         }
       });
     }
-    
+
     const detectCardInteraction = (handLandmarks: any, camera: THREE.Camera) => {
-        const currentMixedElements = mixedElementsRef.current || [];
-        const indexTip = handLandmarks[8];
-        const thumbTip = handLandmarks[4];
-        const distance = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
-        const isPinchingNow = distance < 0.08;
+      const currentMixedElements = mixedElementsRef.current || [];
+      const indexTip = handLandmarks[8];
+      const thumbTip = handLandmarks[4];
+      const wrist = handLandmarks[0];
+      const middleMcp = handLandmarks[9];
 
-        const pinchXNormalized = (indexTip.x + thumbTip.x) / 2;
-        const pinchYNormalized = (indexTip.y + thumbTip.y) / 2;
-        
-        const screenX = (1 - pinchXNormalized) * window.innerWidth;
-        const screenY = pinchYNormalized * window.innerHeight;
+      // 1. MEJORA DEL PELLIZCO: Distancia 2D para máxima estabilidad (Ignoramos Z que causa ruido de cámara web)
+      const handSize2D = Math.hypot(wrist.x - middleMcp.x, wrist.y - middleMcp.y);
+      const safeHandSize2D = handSize2D > 0.01 ? handSize2D : 0.1;
 
-        const isStartingPinch = isPinchingNow && !pinchState.isPinching;
-        const isEndingPinch = !isPinchingNow && pinchState.isPinching;
+      const pinchDistance2D = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+      const normalizedPinchDistance = pinchDistance2D / safeHandSize2D;
 
-        pinchState.isPinching = isPinchingNow;
+      const PINCH_START_RATIO = 0.30; // Pellizco ligeramente más cerrado para agarrar
+      const PINCH_RELEASE_RATIO = 0.35; // Se suelta con solo aflojar un poquito la presión
 
-        if (draggedCardRef.current && isPinchingNow) {
-            const dragDeltaX = screenX - pinchState.lastScreenPos.x;
-            const dragDeltaY = screenY - pinchState.lastScreenPos.y;
+      let rawPinchingDetection = pinchState.isPinching;
+      
+      if (!pinchState.isPinching && normalizedPinchDistance < PINCH_START_RATIO) {
+        rawPinchingDetection = true;
+      } else if (pinchState.isPinching && normalizedPinchDistance > PINCH_RELEASE_RATIO) {
+        rawPinchingDetection = false;
+      }
 
-            const vector = new THREE.Vector3();
-            vector.copy(draggedCardRef.current.position);
-            vector.project(camera); 
+      // Debouncing (Sistema Anti-caídas)
+      let isPinchingNow = pinchState.isPinching;
+      const FRAMES_TO_WAIT = 2; // Casi instantáneo, solo filtra fallos de 1 frame
 
-            vector.x += (dragDeltaX / window.innerWidth) * 2;
-            vector.y -= (dragDeltaY / window.innerHeight) * 2;
-            
-            vector.unproject(camera); 
-            
-            const dir = vector.sub(camera.position).normalize();
-            const distanceToCamera = draggedCardRef.current.position.distanceTo(camera.position);
-            const newPos = camera.position.clone().add(dir.multiplyScalar(distanceToCamera));
-            
-            draggedCardRef.current.position.x = newPos.x;
-            draggedCardRef.current.position.y = newPos.y;
-            
-            pinchState.lastScreenPos = { x: screenX, y: screenY };
-            return;
+      if (rawPinchingDetection) {
+        isPinchingNow = true;
+        pinchState.releaseFramesCount = 0; 
+      } else if (pinchState.isPinching) {
+        pinchState.releaseFramesCount++;
+        if (pinchState.releaseFramesCount >= FRAMES_TO_WAIT) {
+          isPinchingNow = false; 
         }
-        
-        if (isEndingPinch && draggedCardRef.current) {
-            const combinationArea = combinationAreaRef.current;
-            if (combinationArea) {
-                const cardBox = new THREE.Box3().setFromObject(draggedCardRef.current);
-                const areaBox = new THREE.Box3().setFromObject(combinationArea);
-                if (cardBox.intersectsBox(areaBox)) {
-                    const newMixedElements = [...currentMixedElements, draggedCardRef.current.userData];
-                    setMixedElements(newMixedElements);
-                    updateCombinationHints(newMixedElements);
-                    checkCombinations(newMixedElements);
-                }
-            }
+      }
 
-            draggedCardRef.current.userData.isDragging = false;
-            const originalPos = draggedCardRef.current.userData.originalPosition;
-            draggedCardRef.current.position.set(originalPos.x, originalPos.y, originalPos.z);
-            draggedCardRef.current = null;
-            setSelectedElement(null);
-            return;
-        }
+      // 2. SUAVIZADO LERP DEL CURSOR (Menos temblor)
+      const rawPinchXNormalized = (indexTip.x + thumbTip.x) / 2;
+      const rawPinchYNormalized = (indexTip.y + thumbTip.y) / 2;
 
-        let hoveredCard: THREE.Group | null = null;
-        
+      if (smoothedPinchRef.current.x === 0 && smoothedPinchRef.current.y === 0) {
+        smoothedPinchRef.current.x = rawPinchXNormalized;
+        smoothedPinchRef.current.y = rawPinchYNormalized;
+      }
+
+      const LERP_FACTOR = 0.45; // Balance entre rapidez y suavidad
+      smoothedPinchRef.current.x += (rawPinchXNormalized - smoothedPinchRef.current.x) * LERP_FACTOR;
+      smoothedPinchRef.current.y += (rawPinchYNormalized - smoothedPinchRef.current.y) * LERP_FACTOR;
+
+      const pinchXNormalized = smoothedPinchRef.current.x;
+      const pinchYNormalized = smoothedPinchRef.current.y;
+
+      const isStartingPinch = isPinchingNow && !pinchState.isPinching;
+      const isEndingPinch = !isPinchingNow && pinchState.isPinching;
+
+      pinchState.isPinching = isPinchingNow;
+
+      // Coordenadas del ratón virtual (-1 a 1 para Three.js)
+      const mouse2D = new THREE.Vector2(
+        (1 - pinchXNormalized) * 2 - 1,
+        -pinchYNormalized * 2 + 1
+      );
+
+      // 3. MOVIMIENTO PERFECTO (Plane Intersection) + Efecto de Peso
+      if (draggedCardRef.current && isPinchingNow) {
         const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2(
-            (1 - pinchXNormalized) * 2 - 1,
-            -pinchYNormalized * 2 + 1
-        );
-        raycaster.setFromCamera(mouse, camera);
+        raycaster.setFromCamera(mouse2D, camera);
 
-        const intersects = raycaster.intersectObjects(cardMeshesRef.current, true);
-
-        if (intersects.length > 0) {
-            let parentGroup = intersects[0].object;
-            while(parentGroup.parent && parentGroup.parent.type !== 'Scene') {
-                parentGroup = parentGroup.parent;
-            }
-            if (parentGroup.type === 'Group') {
-                 hoveredCard = parentGroup as THREE.Group;
-            }
-        }
+        // Creamos un "Muro invisible" matemático en la profundidad exacta del átomo
+        const planeNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(camera.quaternion);
+        const dragPlane = new THREE.Plane().setFromNormalAndCoplanarPoint(planeNormal, draggedCardRef.current.position);
         
-        cardMeshesRef.current.forEach(card => {
-             if (card !== hoveredCard && !card.userData.isDragging) {
-                 card.scale.set(1, 1, 1);
-             }
-        });
+        const intersectionPoint = new THREE.Vector3();
+        raycaster.ray.intersectPlane(dragPlane, intersectionPoint);
 
-        if (hoveredCard) {
-             if (isStartingPinch && !draggedCardRef.current) {
-                draggedCardRef.current = hoveredCard;
-                hoveredCard.userData.isDragging = true;
-                pinchState.lastScreenPos = { x: screenX, y: screenY };
-                setSelectedElement(hoveredCard.userData);
-             } else if (!draggedCardRef.current) {
-                hoveredCard.scale.set(1.15, 1.15, 1.15);
-                setSelectedElement(hoveredCard.userData);
-             }
-        } else if (!draggedCardRef.current) {
-            setSelectedElement(null);
+        if (intersectionPoint) {
+            // Banda elástica / Peso: El átomo "persigue" a la mano en lugar de pegarse rígidamente
+            const FOLLOW_SPEED = 0.45; // Ajusta esto: 1 es instantáneo, 0.1 es muy pesado/lento
+            draggedCardRef.current.position.x += (intersectionPoint.x - draggedCardRef.current.position.x) * FOLLOW_SPEED;
+            draggedCardRef.current.position.y += (intersectionPoint.y - draggedCardRef.current.position.y) * FOLLOW_SPEED;
         }
+        return;
+      }
+
+      // Zona de mezcla al soltar
+      if (isEndingPinch && draggedCardRef.current) {
+        const combinationArea = combinationAreaRef.current;
+        if (combinationArea) {
+          const cardBox = new THREE.Box3().setFromObject(draggedCardRef.current);
+          const areaBox = new THREE.Box3().setFromObject(combinationArea);
+          if (cardBox.intersectsBox(areaBox)) {
+            const newMixedElements = [...currentMixedElements, draggedCardRef.current.userData];
+            setMixedElements(newMixedElements);
+            updateCombinationHints(newMixedElements);
+            checkCombinations(newMixedElements);
+          }
+        }
+
+        (draggedCardRef.current as any).userData.isDragging = false;
+        const originalPos = (draggedCardRef.current as any).userData.originalPosition;
+        draggedCardRef.current.position.set(originalPos.x, originalPos.y, originalPos.z);
+        draggedCardRef.current = null;
+        setSelectedElement(null);
+        return;
+      }
+
+      // 4. AGARRE POR PROXIMIDAD (Aim Assist magnético)
+      let hoveredCard: THREE.Group | null = null;
+      let minDistance = Infinity;
+      const HOVER_RADIUS = 0.20; // Radio enorme de ayuda (20% de la pantalla). ¡Imposible fallar!
+
+      cardMeshesRef.current.forEach(card => {
+        if ((card as any).userData.isDragging) return;
+
+        // Proyectar la posición 3D del átomo a coordenadas 2D en pantalla
+        const cardPos2D = card.position.clone();
+        cardPos2D.project(camera);
+
+        const distance2D = Math.hypot(cardPos2D.x - mouse2D.x, cardPos2D.y - mouse2D.y);
+
+        if (distance2D < HOVER_RADIUS && distance2D < minDistance) {
+            minDistance = distance2D;
+            hoveredCard = card;
+        }
+      });
+
+      // Restaurar el tamaño de las tarjetas que ya no estamos apuntando (con animación suave LERP)
+      cardMeshesRef.current.forEach(card => {
+          if (card !== hoveredCard && !(card as any).userData.isDragging) {
+              (card as any).scale.lerp(new THREE.Vector3(1, 1, 1), 0.2);
+          }
+      });
+
+      // Efectos visuales al apuntar o agarrar
+      if (hoveredCard) {
+        if (isStartingPinch && !draggedCardRef.current) {
+          draggedCardRef.current = hoveredCard;
+          (hoveredCard as any).userData.isDragging = true;
+          setSelectedElement((hoveredCard as any).userData);
+        } else if (!draggedCardRef.current) {
+          (hoveredCard as any).scale.lerp(new THREE.Vector3(1.15, 1.15, 1.15), 0.2); // "Pop" visual suave
+          setSelectedElement((hoveredCard as any).userData);
+        }
+      } else if (!draggedCardRef.current) {
+        setSelectedElement(null);
+      }
     }
 
 
@@ -577,9 +626,9 @@ export default function AtomicCanvasClient() {
         sceneRef.current = scene;
         const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 100);
         cameraRef.current = camera;
-        
-        const worldWidth = 14; 
-        const worldHeight = 8; 
+
+        const worldWidth = 14;
+        const worldHeight = 8;
         camera.position.z = Math.max(
           worldWidth / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2) * camera.aspect)),
           worldHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)))
@@ -596,7 +645,7 @@ export default function AtomicCanvasClient() {
         const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
         directionalLight.position.set(5, 10, 7.5);
         scene.add(directionalLight);
-        
+
         createCards(scene);
 
         const comboAreaGeometry = new THREE.BoxGeometry(4, 2, 0.2);
@@ -608,36 +657,40 @@ export default function AtomicCanvasClient() {
 
         hands = new window.Hands({ locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` });
         hands.setOptions({ maxNumHands: 2, modelComplexity: 0, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
-        
+
         hands.onResults((results: any) => {
           handsCtx.save();
           handsCtx.clearRect(0, 0, handsCanvasEl.width, handsCanvasEl.height);
 
           if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0 && cameraRef.current) {
-             let interactingHand = null;
-             
-             results.multiHandLandmarks.forEach((landmarks: any, i: number) => {
-                 const isRight = results.multiHandedness?.[i]?.label !== 'Right'; // MediaPipe mirrors 'Right' as left hand
-                 const color = isRight ? '#FF7B00' : '#007BFF';
-                 const landmarkColor = isRight ? '#07C1FF' : '#FFC107';
-                 
-                 if (i === 0) interactingHand = landmarks;
-                 
-                 window.drawConnectors(handsCtx, landmarks, window.HAND_CONNECTIONS, { color: color, lineWidth: 5 });
-                 window.drawLandmarks(handsCtx, landmarks, { color: landmarkColor, lineWidth: 2, radius: 5 });
-             });
+            let interactingHand = null;
 
-             if (interactingHand) {
-                 detectCardInteraction(interactingHand, cameraRef.current);
-             }
+            results.multiHandLandmarks.forEach((landmarks: any, i: number) => {
+              const isRight = results.multiHandedness?.[i]?.label !== 'Right'; // MediaPipe mirrors 'Right' as left hand
+              const color = isRight ? '#FF7B00' : '#007BFF';
+              const landmarkColor = isRight ? '#07C1FF' : '#FFC107';
+
+              if (i === 0) interactingHand = landmarks;
+
+              window.drawConnectors(handsCtx, landmarks, window.HAND_CONNECTIONS, { color: color, lineWidth: 5 });
+              window.drawLandmarks(handsCtx, landmarks, { color: landmarkColor, lineWidth: 2, radius: 5 });
+            });
+
+            if (interactingHand) {
+              detectCardInteraction(interactingHand, cameraRef.current);
+            }
 
           } else {
-             if (draggedCardRef.current) {
-                draggedCardRef.current.userData.isDragging = false;
-                const originalPos = draggedCardRef.current.userData.originalPosition;
-                draggedCardRef.current.position.set(originalPos.x, originalPos.y, originalPos.z);
-                draggedCardRef.current = null;
-                setSelectedElement(null);
+            // Reset LERP when hand is lost to avoid jumping when it returns
+            smoothedPinchRef.current = { x: 0, y: 0 };
+            pinchState.releaseFramesCount = 0; // Reset debouncing counter
+
+            if (draggedCardRef.current) {
+              draggedCardRef.current.userData.isDragging = false;
+              const originalPos = draggedCardRef.current.userData.originalPosition;
+              draggedCardRef.current.position.set(originalPos.x, originalPos.y, originalPos.z);
+              draggedCardRef.current = null;
+              setSelectedElement(null);
             }
             pinchState.isPinching = false;
           }
@@ -678,7 +731,7 @@ export default function AtomicCanvasClient() {
     init();
 
     return cleanup;
-  }, []); 
+  }, []);
 
   const handleClearMixedElements = () => {
     setMixedElements([]);
@@ -714,16 +767,16 @@ export default function AtomicCanvasClient() {
         />
         <StatsCard element={selectedElement} />
         <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/50 text-white px-6 py-2 rounded-lg flex items-center gap-2 z-20">
-            <FlaskConical />
-            <p className="font-bold text-lg">Espacio de Combinación</p>
-            <div className="flex gap-2 ml-4">
-                {mixedElements.map((el, i) => (
-                    <span key={i} className="bg-white/30 text-black font-bold px-2 py-1 rounded-md text-sm">{el.simbolo}</span>
-                ))}
-            </div>
-            {mixedElements.length > 0 && (
-                <Button variant="destructive" size="sm" onClick={handleClearMixedElements}>Limpiar</Button>
-            )}
+          <FlaskConical />
+          <p className="font-bold text-lg">Espacio de Combinación</p>
+          <div className="flex gap-2 ml-4">
+            {mixedElements.map((el, i) => (
+              <span key={i} className="bg-white/30 text-black font-bold px-2 py-1 rounded-md text-sm">{el.simbolo}</span>
+            ))}
+          </div>
+          {mixedElements.length > 0 && (
+            <Button variant="destructive" size="sm" onClick={handleClearMixedElements}>Limpiar</Button>
+          )}
         </div>
         <CombinationGuide hints={combinationHints} mixedElements={mixedElements} />
       </div>
