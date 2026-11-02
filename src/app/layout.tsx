@@ -1,34 +1,8 @@
-import type { Metadata } from 'next';
+﻿import type { Metadata } from 'next';
 import './globals.css';
-import { Toaster } from '@/components/ui/toaster';
-
-export const metadata: Metadata = {
-  title: 'Atomic Canvas',
-  description: 'An augmented reality chemistry lab.',
-};
-
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
-        
-        <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossOrigin="anonymous" async></script>
-        <script src="https://cdn.jsdelivr.net/npm/@mediapipe/controls_utils/controls_utils.js" crossOrigin="anonymous" async></script>
-        <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossOrigin="anonymous" async></script>
-        <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossOrigin="anonymous" async></script>
-      </head>
-      <body className="font-body antialiased">
-        {children}
-        <Toaster />
-      </body>
-    </html>
-  );
+import './manrope.css';
+export const metadata: Metadata = { title: 'Atomic Canvas · Tu laboratorio de química', description: 'Explora átomos y construye moléculas con tus manos. Un laboratorio educativo con reacciones 3D y NOVA, tu guía de química.' };
+export default function RootLayout({children}: Readonly<{children: React.ReactNode}>) {
+  return <html lang="es"><body>{children}</body></html>;
 }
+

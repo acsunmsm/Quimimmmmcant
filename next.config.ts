@@ -1,35 +1,12 @@
-import type {NextConfig} from 'next';
-
+﻿import type { NextConfig } from 'next';
 const nextConfig: NextConfig = {
-  /* config options here */
-  typescript: {
-    ignoreBuildErrors: true,
+  devIndicators: false,
+  webpack(config) {
+    // Keep module and loader identities consistent when node_modules is a Windows junction.
+    config.resolve.symlinks = false;
+    config.resolveLoader.symlinks = false;
+    return config;
   },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'placehold.co',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'picsum.photos',
-        port: '',
-        pathname: '/**',
-      },
-    ],
-  },
+  images: {remotePatterns:[{protocol:'https',hostname:'images.unsplash.com'},{protocol:'https',hostname:'picsum.photos'},{protocol:'https',hostname:'placehold.co'}]},
 };
-
 export default nextConfig;

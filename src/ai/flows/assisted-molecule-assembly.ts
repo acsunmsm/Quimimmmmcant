@@ -25,7 +25,7 @@ const AssistMoleculeAssemblyOutputSchema = z.object({
 export type AssistMoleculeAssemblyOutput = z.infer<typeof AssistMoleculeAssemblyOutputSchema>;
 
 export async function assistMoleculeAssembly(input: AssistMoleculeAssemblyInput): Promise<AssistMoleculeAssemblyOutput> {
-  return assistMoleculeAssemblyFlow(input);
+  return assistMoleculeAssemblyFlow(AssistMoleculeAssemblyInputSchema.parse(input));
 }
 
 const moleculeAssemblyPrompt = ai.definePrompt({
@@ -40,8 +40,7 @@ const moleculeAssemblyPrompt = ai.definePrompt({
 
   Determine if the combination is valid according to the rules of chemistry. Provide a helpful hint to the user, explaining why the combination is valid or invalid.  Be concise.
 
-  Is Valid Combination: {{isValidCombination}}
-  Hint: {{hint}}`,
+  Return isValidCombination and hint in the requested structured output.`,
 });
 
 const assistMoleculeAssemblyFlow = ai.defineFlow(
@@ -52,6 +51,7 @@ const assistMoleculeAssemblyFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await moleculeAssemblyPrompt(input);
-    return output!;
+    if (!output) throw new Error('No se recibió una respuesta válida del asistente. Inténtalo de nuevo.');
+    return output;
   }
 );
