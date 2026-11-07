@@ -41,7 +41,7 @@ export function useHandTracking(onGesture: (g: Gesture) => void, sensitivity: nu
     };
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('La cámara necesita HTTPS o localhost y un navegador compatible.');
-      const worker = new Worker('/hand-worker.js');
+      const worker = new Worker('/Quimimmmmcant/hand-worker.js');
       resources.current.worker = worker;
       let busy = false, ready = false, lastFrame = -1, lastSent = 0;
       const video = videoRef.current!;
